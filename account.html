@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Account - Ramdhan's Corner</title>
+
+    <link rel="stylesheet" href="style.css">
+
+    <style>
+
+        .admin-box {
+            max-width: 480px;
+            margin: 40px auto;
+        }
+
+        .admin-field {
+            margin-bottom: 16px;
+        }
+
+        .admin-field label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .admin-field input,
+        .admin-field textarea,
+        .admin-field select {
+            width: 100%;
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--surface-soft);
+            color: var(--text);
+            font-family: inherit;
+            font-size: 14px;
+        }
+
+        .admin-field textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .admin-btn {
+            width: 100%;
+            padding: 12px;
+            border-radius: 10px;
+            border: none;
+            background: var(--accent);
+            color: #ffffff;
+            font-weight: bold;
+            font-size: 15px;
+            cursor: pointer;
+        }
+
+        .admin-btn:hover {
+            opacity: 0.9;
+        }
+
+        .google-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+
+            width: 100%;
+            padding: 12px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--surface-soft);
+            color: var(--text);
+            font-weight: bold;
+            font-size: 15px;
+            cursor: pointer;
+        }
+
+        .google-btn:hover {
+            border-color: var(--accent);
+        }
+
+        .admin-status {
+            margin-top: 14px;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        .admin-status.error { color: #e53e3e; }
+        .admin-status.success { color: #38a169; }
+
+        #logout-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 8px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .reference-input-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .reference-input-row select { flex: 0 0 110px; }
+        .reference-input-row input { flex: 1; }
+
+        #login-box, #admin-panel, #visitor-panel {
+            display: none;
+        }
+
+        .profile-strip {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .profile-strip img {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+        }
+
+        .role-badge {
+            display: inline-block;
+            font-size: 11px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            padding: 3px 10px;
+            border-radius: 20px;
+            background: var(--accent);
+            color: #fff;
+            margin-top: 2px;
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+    <header>
+
+        <h1>Ramdhan's Corner</h1>
+
+        <nav>
+            <a href="index.html">Home</a>
+        </nav>
+
+    </header>
+
+
+    <main>
+
+        <!-- ==========================================
+             LOGIN BOX (belum login)
+        =========================================== -->
+
+        <section id="login-box" class="admin-box">
+
+            <h2>Masuk</h2>
+
+            <p style="font-size:14px; color:var(--text-light); margin-bottom:20px;">
+                Login untuk komentar di tulisan, atau masuk sebagai admin.
+            </p>
+
+            <button class="google-btn" id="google-login-btn">
+                Sign in with Google
+            </button>
+
+            <p class="admin-status" id="login-status"></p>
+
+        </section>
+
+
+        <!-- ==========================================
+             ADMIN PANEL (kalau yang login = email admin)
+        =========================================== -->
+
+        <section id="admin-panel" class="admin-box">
+
+            <div class="profile-strip">
+                <img id="admin-avatar" src="" alt="">
+                <div>
+                    <div id="admin-name"></div>
+                    <span class="role-badge">ADMIN</span>
+                </div>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h2 style="margin:0;">Tambah Writing</h2>
+                <button id="logout-btn-admin">Logout</button>
+            </div>
+
+            <div class="admin-field">
+                <label for="w-category">Kategori</label>
+                <select id="w-category">
+                    <option value="psychology">Psychology</option>
+                    <option value="technology">Technology & Computer Science</option>
+                    <option value="society">Society</option>
+                    <option value="curiosity">Curiosity</option>
+                    <option value="personal">Personal</option>
+                </select>
+            </div>
+
+            <div class="admin-field">
+                <label for="w-title">Judul</label>
+                <input type="text" id="w-title" placeholder="Judul tulisan">
+            </div>
+
+            <div class="admin-field">
+                <label for="w-desc">Deskripsi Singkat</label>
+                <textarea id="w-desc" placeholder="1-2 kalimat ringkasan"></textarea>
+            </div>
+
+            <div class="admin-field">
+                <label for="w-content">Isi Tulisan</label>
+                <textarea id="w-content" placeholder="Isi lengkap tulisan" style="min-height:180px;"></textarea>
+            </div>
+
+            <div class="admin-field">
+                <label for="w-photos">Link Foto (satu baris satu link, opsional)</label>
+                <textarea id="w-photos" placeholder="https://.../foto1.jpg"></textarea>
+            </div>
+
+            <div class="admin-field">
+                <label>Referensi (opsional)</label>
+
+                <div id="reference-inputs">
+                    <div class="reference-input-row">
+                        <select class="ref-type">
+                            <option value="instagram">Instagram</option>
+                            <option value="youtube">YouTube</option>
+                            <option value="journal">Journal</option>
+                            <option value="article">Article</option>
+                            <option value="other">Other</option>
+                        </select>
+                        <input type="text" class="ref-title" placeholder="Judul referensi">
+                        <input type="text" class="ref-url" placeholder="URL">
+                    </div>
+                </div>
+
+                <button type="button" class="admin-btn" id="add-reference-btn" style="margin-top:8px;">
+                    + Tambah Referensi
+                </button>
+            </div>
+
+            <button class="admin-btn" id="submit-writing-btn" style="margin-top:20px;">
+                Submit Writing
+            </button>
+
+            <p class="admin-status" id="writing-status"></p>
+
+        </section>
+
+
+        <!-- ==========================================
+             VISITOR PANEL (kalau yang login BUKAN admin)
+        =========================================== -->
+
+        <section id="visitor-panel" class="admin-box">
+
+            <div class="profile-strip">
+                <img id="visitor-avatar" src="" alt="">
+                <div>
+                    <div id="visitor-name"></div>
+                    <span class="role-badge" style="background:var(--text-light);">VISITOR</span>
+                </div>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <p>Kamu login sebagai pengunjung. Sekarang bisa komen di halaman tulisan mana pun.</p>
+                <button id="logout-btn-visitor">Logout</button>
+            </div>
+
+        </section>
+
+    </main>
+
+
+    <footer>
+        <p>© 2026 Ramdhan</p>
+    </footer>
+
+
+    <script type="module">
+
+        import { auth, db } from "./firebase-config.js";
+
+        import {
+            GoogleAuthProvider,
+            signInWithPopup,
+            signOut,
+            onAuthStateChanged
+        } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+
+        import {
+            collection,
+            addDoc,
+            serverTimestamp
+        } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+
+        // ---- GANTI INI SESUAI EMAIL ADMIN KAMU ----
+        const ADMIN_EMAIL = "im.raito.id@gmail.com";
+
+
+        const loginBox = document.getElementById("login-box");
+        const adminPanel = document.getElementById("admin-panel");
+        const visitorPanel = document.getElementById("visitor-panel");
+        const loginStatus = document.getElementById("login-status");
+        const writingStatus = document.getElementById("writing-status");
+
+
+        // ---- CEK STATUS LOGIN & TENTUKAN ROLE ----
+
+        onAuthStateChanged(auth, (user) => {
+
+            loginBox.style.display = "none";
+            adminPanel.style.display = "none";
+            visitorPanel.style.display = "none";
+
+            if (!user) {
+                loginBox.style.display = "block";
+                return;
+            }
+
+            if (user.email === ADMIN_EMAIL) {
+                adminPanel.style.display = "block";
+                document.getElementById("admin-avatar").src = user.photoURL || "";
+                document.getElementById("admin-name").textContent = user.displayName || user.email;
+            } else {
+                visitorPanel.style.display = "block";
+                document.getElementById("visitor-avatar").src = user.photoURL || "";
+                document.getElementById("visitor-name").textContent = user.displayName || user.email;
+            }
+
+        });
+
+
+        // ---- LOGIN GOOGLE ----
+
+        document.getElementById("google-login-btn").addEventListener("click", async () => {
+
+            const provider = new GoogleAuthProvider();
+
+            loginStatus.textContent = "Membuka login Google...";
+            loginStatus.className = "admin-status";
+
+            try {
+                await signInWithPopup(auth, provider);
+                loginStatus.textContent = "";
+            } catch (error) {
+                loginStatus.textContent = "Login gagal, coba lagi.";
+                loginStatus.className = "admin-status error";
+            }
+
+        });
+
+
+        // ---- LOGOUT (admin & visitor) ----
+
+        document.getElementById("logout-btn-admin").addEventListener("click", () => signOut(auth));
+        document.getElementById("logout-btn-visitor").addEventListener("click", () => signOut(auth));
+
+
+        // ---- TAMBAH INPUT REFERENSI ----
+
+        document.getElementById("add-reference-btn").addEventListener("click", () => {
+
+            const container = document.getElementById("reference-inputs");
+
+            const row = document.createElement("div");
+            row.className = "reference-input-row";
+
+            row.innerHTML = `
+                <select class="ref-type">
+                    <option value="instagram">Instagram</option>
+                    <option value="youtube">YouTube</option>
+                    <option value="journal">Journal</option>
+                    <option value="article">Article</option>
+                    <option value="other">Other</option>
+                </select>
+                <input type="text" class="ref-title" placeholder="Judul referensi">
+                <input type="text" class="ref-url" placeholder="URL">
+            `;
+
+            container.appendChild(row);
+
+        });
+
+
+        // ---- SUBMIT WRITING (admin only, tapi rules Firestore yang jamin keamanannya) ----
+
+        document.getElementById("submit-writing-btn").addEventListener("click", async () => {
+
+            const category = document.getElementById("w-category").value;
+            const title = document.getElementById("w-title").value.trim();
+            const description = document.getElementById("w-desc").value.trim();
+            const content = document.getElementById("w-content").value.trim();
+
+            const photosRaw = document.getElementById("w-photos").value.trim();
+            const photos = photosRaw
+                ? photosRaw.split("\n").map(p => p.trim()).filter(p => p)
+                : [];
+
+            const references = [];
+            document.querySelectorAll("#reference-inputs .reference-input-row").forEach(row => {
+                const type = row.querySelector(".ref-type").value;
+                const refTitle = row.querySelector(".ref-title").value.trim();
+                const url = row.querySelector(".ref-url").value.trim();
+
+                if (refTitle && url) {
+                    references.push({ type, title: refTitle, url });
+                }
+            });
+
+            if (!title || !description || !content) {
+                writingStatus.textContent = "Judul, deskripsi, dan isi tulisan wajib diisi.";
+                writingStatus.className = "admin-status error";
+                return;
+            }
+
+            writingStatus.textContent = "Menyimpan...";
+            writingStatus.className = "admin-status";
+
+            try {
+
+                await addDoc(collection(db, "writings"), {
+                    category,
+                    title,
+                    description,
+                    content,
+                    photos,
+                    references,
+                    createdAt: serverTimestamp()
+                });
+
+                writingStatus.textContent = "Berhasil disimpan!";
+                writingStatus.className = "admin-status success";
+
+                document.getElementById("w-title").value = "";
+                document.getElementById("w-desc").value = "";
+                document.getElementById("w-content").value = "";
+                document.getElementById("w-photos").value = "";
+                document.getElementById("reference-inputs").innerHTML = `
+                    <div class="reference-input-row">
+                        <select class="ref-type">
+                            <option value="instagram">Instagram</option>
+                            <option value="youtube">YouTube</option>
+                            <option value="journal">Journal</option>
+                            <option value="article">Article</option>
+                            <option value="other">Other</option>
+                        </select>
+                        <input type="text" class="ref-title" placeholder="Judul referensi">
+                        <input type="text" class="ref-url" placeholder="URL">
+                    </div>
+                `;
+
+            } catch (error) {
+                writingStatus.textContent = "Gagal menyimpan: " + error.message;
+                writingStatus.className = "admin-status error";
+            }
+
+        });
+
+    </script>
+
+</body>
+
+</html>
