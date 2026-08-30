@@ -9,7 +9,7 @@
         content="width=device-width, initial-scale=1.0"
     >
 
-    <title>Psychology - Ramdhan's Corner</title>
+    <title>Curiosity - Ramdhan's Corner</title>
 
     <link rel="stylesheet" href="../style.css">
 </head>
@@ -36,11 +36,10 @@
                 04 · CURIOSITY
             </p>
 
-            <h2>Curiosity 🔎 </h2>
+            <h2>Curiosity ❓</h2>
 
             <p>
-                Questions that randomly appear
-                in my head and refuse to leave.
+                Questions that randomly appear in my head and refuse to leave.
             </p>
 
         </section>
@@ -50,22 +49,11 @@
 
             <h2>Articles</h2>
 
-            <article class="writing-card">
-
-                <p class="writing-category">
-                    PSYCHOLOGY
+            <div id="article-list">
+                <p style="color:var(--text-light); font-size:14px;">
+                    Memuat tulisan...
                 </p>
-
-                <h3>
-                    Belum Ada Tulisan
-                </h3>
-
-                <p>
-                    Tulisan pertamaku di kategori ini
-                    akan muncul di sini.
-                </p>
-
-            </article>
+            </div>
 
         </section>
 
@@ -83,10 +71,84 @@
 
 
     <footer>
-
         <p>© 2026 Ramdhan</p>
-
     </footer>
+
+
+    <script type="module">
+
+        import { db } from "../firebase-config.js";
+
+        import {
+            collection,
+            query,
+            where,
+            orderBy,
+            getDocs
+        } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+
+        const CATEGORY = "curiosity";
+
+        const listEl = document.getElementById("article-list");
+
+
+        async function loadArticles() {
+
+            try {
+
+                const q = query(
+                    collection(db, "writings"),
+                    where("category", "==", CATEGORY),
+                    orderBy("createdAt", "desc")
+                );
+
+                const snapshot = await getDocs(q);
+
+                if (snapshot.empty) {
+                    listEl.innerHTML = `
+                        <article class="writing-card">
+                            <p class="writing-category">CURIOSITY</p>
+                            <h3>Belum Ada Tulisan</h3>
+                            <p>Tulisan pertamaku di kategori ini akan muncul di sini.</p>
+                        </article>
+                    `;
+                    return;
+                }
+
+                listEl.innerHTML = "";
+
+                snapshot.forEach((doc) => {
+
+                    const data = doc.data();
+
+                    const card = document.createElement("article");
+                    card.className = "writing-card";
+
+                    card.innerHTML = `
+                        <p class="writing-category">CURIOSITY</p>
+                        <h3>${data.title}</h3>
+                        <p>${data.description}</p>
+                        <a href="article.html?id=${doc.id}">Read this →</a>
+                    `;
+
+                    listEl.appendChild(card);
+
+                });
+
+            } catch (error) {
+                listEl.innerHTML = `
+                    <p style="color:#e53e3e; font-size:14px;">
+                        Gagal memuat tulisan: ${error.message}
+                    </p>
+                `;
+            }
+
+        }
+
+        loadArticles();
+
+    </script>
 
 </body>
 
