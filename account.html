@@ -419,6 +419,51 @@
 
 
         <!-- ==========================================
+             FORM TAMBAH MUSIC
+        =========================================== -->
+
+        <section id="music-panel" class="admin-box">
+
+            <h2>Tambah Musik</h2>
+
+            <div class="admin-field">
+                <label for="m-title">Judul Lagu</label>
+                <input type="text" id="m-title" placeholder="Nama lagu">
+            </div>
+
+            <div class="admin-field">
+                <label for="m-artist">Artis</label>
+                <input type="text" id="m-artist" placeholder="Nama penyanyi/artis">
+            </div>
+
+            <div class="admin-field">
+                <label for="m-image">Link Gambar (cover)</label>
+                <input type="text" id="m-image" placeholder="https://.../cover.jpg">
+            </div>
+
+            <div class="admin-field">
+                <label for="m-link">Link Spotify/YouTube Music</label>
+                <input type="text" id="m-link" placeholder="https://open.spotify.com/...">
+            </div>
+
+            <div class="admin-field">
+                <label for="m-status">Jadikan "Currently Listening"?</label>
+                <select id="m-status">
+                    <option value="library">Tidak, cukup di Library</option>
+                    <option value="currently">Ya, ini yang lagi didengarkan</option>
+                </select>
+            </div>
+
+            <button class="admin-btn" id="submit-music-btn">
+                Submit Musik
+            </button>
+
+            <p class="admin-status" id="music-status"></p>
+
+        </section>
+
+
+        <!-- ==========================================
              VISITOR PANEL (kalau yang login BUKAN admin)
         =========================================== -->
 
@@ -462,6 +507,9 @@
             collection,
             addDoc,
             getDocs,
+            query,
+            where,
+            updateDoc,
             serverTimestamp
         } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
@@ -475,12 +523,14 @@
         const journalPanel = document.getElementById("journal-panel");
         const gamePanel = document.getElementById("game-panel");
         const sessionPanel = document.getElementById("session-panel");
+        const musicPanel = document.getElementById("music-panel");
         const visitorPanel = document.getElementById("visitor-panel");
         const loginStatus = document.getElementById("login-status");
         const writingStatus = document.getElementById("writing-status");
         const journalStatus = document.getElementById("journal-status");
         const gameStatus = document.getElementById("game-status");
         const sessionStatus = document.getElementById("session-status");
+        const musicStatus = document.getElementById("music-status");
 
 
         // ---- CEK STATUS LOGIN & TENTUKAN ROLE ----
@@ -492,6 +542,7 @@
             journalPanel.style.display = "none";
             gamePanel.style.display = "none";
             sessionPanel.style.display = "none";
+            musicPanel.style.display = "none";
             visitorPanel.style.display = "none";
 
             if (!user) {
@@ -504,6 +555,7 @@
                 journalPanel.style.display = "block";
                 gamePanel.style.display = "block";
                 sessionPanel.style.display = "block";
+                musicPanel.style.display = "block";
                 document.getElementById("admin-avatar").src = user.photoURL || "";
                 document.getElementById("admin-name").textContent = user.displayName || user.email;
                 populateGameDropdown();
@@ -844,6 +896,70 @@
             } catch (error) {
                 sessionStatus.textContent = "Gagal menyimpan: " + error.message;
                 sessionStatus.className = "admin-status error";
+            }
+
+        });
+
+
+        // ---- SUBMIT MUSIC ----
+
+        document.getElementById("submit-music-btn").addEventListener("click", async () => {
+
+            const title = document.getElementById("m-title").value.trim();
+            const artist = document.getElementById("m-artist").value.trim();
+            const image = document.getElementById("m-image").value.trim();
+            const link = document.getElementById("m-link").value.trim();
+            const status = document.getElementById("m-status").value;
+
+            if (!title || !artist) {
+                musicStatus.textContent = "Judul dan artis wajib diisi.";
+                musicStatus.className = "admin-status error";
+                return;
+            }
+
+            musicStatus.textContent = "Menyimpan...";
+            musicStatus.className = "admin-status";
+
+            try {
+
+                // Kalau lagu ini dijadikan "currently", matikan dulu
+                // status currently di lagu lain (biar cuma 1 yang aktif)
+                if (status === "currently") {
+
+                    const currentlyQuery = query(
+                        collection(db, "music"),
+                        where("status", "==", "currently")
+                    );
+
+                    const currentlySnapshot = await getDocs(currentlyQuery);
+
+                    for (const docSnap of currentlySnapshot.docs) {
+                        await updateDoc(docSnap.ref, { status: "library" });
+                    }
+
+                }
+
+                await addDoc(collection(db, "music"), {
+                    title,
+                    artist,
+                    image,
+                    link,
+                    status,
+                    createdAt: serverTimestamp()
+                });
+
+                musicStatus.textContent = "Berhasil disimpan!";
+                musicStatus.className = "admin-status success";
+
+                document.getElementById("m-title").value = "";
+                document.getElementById("m-artist").value = "";
+                document.getElementById("m-image").value = "";
+                document.getElementById("m-link").value = "";
+                document.getElementById("m-status").selectedIndex = 0;
+
+            } catch (error) {
+                musicStatus.textContent = "Gagal menyimpan: " + error.message;
+                musicStatus.className = "admin-status error";
             }
 
         });
