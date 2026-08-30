@@ -19,10 +19,19 @@
         .journal-entry {
             padding: 16px 0;
             border-bottom: 1px solid var(--border);
+            max-width: 100%;
+            overflow-wrap: break-word;
+            word-wrap: break-word;
         }
 
         .journal-entry:last-child {
             border-bottom: none;
+        }
+
+        .journal-entry h3,
+        .journal-entry p {
+            overflow-wrap: break-word;
+            word-wrap: break-word;
         }
 
         .journal-meta {
@@ -30,6 +39,7 @@
             align-items: center;
             gap: 8px;
             margin-bottom: 6px;
+            flex-wrap: wrap;
         }
 
         .journal-mood {
@@ -41,6 +51,7 @@
             gap: 6px;
             flex-wrap: wrap;
             margin-top: 8px;
+            max-width: 100%;
         }
 
         .journal-tag {
@@ -49,6 +60,7 @@
             border-radius: 20px;
             background: var(--surface-soft);
             color: var(--text-light);
+            white-space: nowrap;
         }
 
         .journal-photos {
@@ -56,6 +68,7 @@
             grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
             gap: 8px;
             margin: 10px 0;
+            max-width: 100%;
         }
 
         .journal-photos img {
