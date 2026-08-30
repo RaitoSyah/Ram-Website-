@@ -419,12 +419,13 @@
 
 
         <!-- ==========================================
-             FORM TAMBAH MUSIC
+             FORM TAMBAH MUSIC KE LIBRARY
+             (sekali per lagu, kecuali mau edit)
         =========================================== -->
 
         <section id="music-panel" class="admin-box">
 
-            <h2>Tambah Musik</h2>
+            <h2>Tambah Musik ke Library</h2>
 
             <div class="admin-field">
                 <label for="m-title">Judul Lagu</label>
@@ -446,19 +447,40 @@
                 <input type="text" id="m-link" placeholder="https://open.spotify.com/...">
             </div>
 
-            <div class="admin-field">
-                <label for="m-status">Jadikan "Currently Listening"?</label>
-                <select id="m-status">
-                    <option value="library">Tidak, cukup di Library</option>
-                    <option value="currently">Ya, ini yang lagi didengarkan</option>
-                </select>
-            </div>
-
             <button class="admin-btn" id="submit-music-btn">
-                Submit Musik
+                Simpan ke Library
             </button>
 
             <p class="admin-status" id="music-status"></p>
+
+        </section>
+
+
+        <!-- ==========================================
+             JADIKAN CURRENTLY LISTENING
+             (pilih dari library yang sudah ada)
+        =========================================== -->
+
+        <section id="current-music-panel" class="admin-box">
+
+            <h2>Jadikan Currently Listening</h2>
+
+            <p style="font-size:14px; color:var(--text-light); margin-bottom:16px;">
+                Pilih lagu dari library yang sudah ada.
+            </p>
+
+            <div class="admin-field">
+                <label for="m-current-select">Pilih Lagu</label>
+                <select id="m-current-select">
+                    <option value="">Memuat daftar musik...</option>
+                </select>
+            </div>
+
+            <button class="admin-btn" id="submit-current-music-btn">
+                Jadikan Currently
+            </button>
+
+            <p class="admin-status" id="current-music-status"></p>
 
         </section>
 
@@ -509,6 +531,7 @@
             getDocs,
             query,
             where,
+            doc,
             updateDoc,
             serverTimestamp
         } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
@@ -524,6 +547,7 @@
         const gamePanel = document.getElementById("game-panel");
         const sessionPanel = document.getElementById("session-panel");
         const musicPanel = document.getElementById("music-panel");
+        const currentMusicPanel = document.getElementById("current-music-panel");
         const visitorPanel = document.getElementById("visitor-panel");
         const loginStatus = document.getElementById("login-status");
         const writingStatus = document.getElementById("writing-status");
@@ -531,6 +555,7 @@
         const gameStatus = document.getElementById("game-status");
         const sessionStatus = document.getElementById("session-status");
         const musicStatus = document.getElementById("music-status");
+        const currentMusicStatus = document.getElementById("current-music-status");
 
 
         // ---- CEK STATUS LOGIN & TENTUKAN ROLE ----
@@ -543,6 +568,7 @@
             gamePanel.style.display = "none";
             sessionPanel.style.display = "none";
             musicPanel.style.display = "none";
+            currentMusicPanel.style.display = "none";
             visitorPanel.style.display = "none";
 
             if (!user) {
@@ -556,9 +582,11 @@
                 gamePanel.style.display = "block";
                 sessionPanel.style.display = "block";
                 musicPanel.style.display = "block";
+                currentMusicPanel.style.display = "block";
                 document.getElementById("admin-avatar").src = user.photoURL || "";
                 document.getElementById("admin-name").textContent = user.displayName || user.email;
                 populateGameDropdown();
+                populateMusicDropdown();
             } else {
                 visitorPanel.style.display = "block";
                 document.getElementById("visitor-avatar").src = user.photoURL || "";
@@ -901,7 +929,7 @@
         });
 
 
-        // ---- SUBMIT MUSIC ----
+        // ---- SUBMIT MUSIC KE LIBRARY ----
 
         document.getElementById("submit-music-btn").addEventListener("click", async () => {
 
@@ -909,7 +937,6 @@
             const artist = document.getElementById("m-artist").value.trim();
             const image = document.getElementById("m-image").value.trim();
             const link = document.getElementById("m-link").value.trim();
-            const status = document.getElementById("m-status").value;
 
             if (!title || !artist) {
                 musicStatus.textContent = "Judul dan artis wajib diisi.";
@@ -922,44 +949,103 @@
 
             try {
 
-                // Kalau lagu ini dijadikan "currently", matikan dulu
-                // status currently di lagu lain (biar cuma 1 yang aktif)
-                if (status === "currently") {
-
-                    const currentlyQuery = query(
-                        collection(db, "music"),
-                        where("status", "==", "currently")
-                    );
-
-                    const currentlySnapshot = await getDocs(currentlyQuery);
-
-                    for (const docSnap of currentlySnapshot.docs) {
-                        await updateDoc(docSnap.ref, { status: "library" });
-                    }
-
-                }
-
                 await addDoc(collection(db, "music"), {
                     title,
                     artist,
                     image,
                     link,
-                    status,
+                    status: "library",
                     createdAt: serverTimestamp()
                 });
 
-                musicStatus.textContent = "Berhasil disimpan!";
+                musicStatus.textContent = "Berhasil disimpan ke library!";
                 musicStatus.className = "admin-status success";
 
                 document.getElementById("m-title").value = "";
                 document.getElementById("m-artist").value = "";
                 document.getElementById("m-image").value = "";
                 document.getElementById("m-link").value = "";
-                document.getElementById("m-status").selectedIndex = 0;
+
+                populateMusicDropdown();
 
             } catch (error) {
                 musicStatus.textContent = "Gagal menyimpan: " + error.message;
                 musicStatus.className = "admin-status error";
+            }
+
+        });
+
+
+        // ---- ISI DROPDOWN "JADIKAN CURRENTLY" DARI LIBRARY ----
+
+        async function populateMusicDropdown() {
+
+            const select = document.getElementById("m-current-select");
+
+            try {
+
+                const snapshot = await getDocs(collection(db, "music"));
+
+                if (snapshot.empty) {
+                    select.innerHTML = `<option value="">Belum ada musik di library</option>`;
+                    return;
+                }
+
+                select.innerHTML = "";
+
+                snapshot.forEach((docSnap) => {
+                    const data = docSnap.data();
+                    const option = document.createElement("option");
+                    option.value = docSnap.id;
+                    option.textContent = `${data.title} - ${data.artist}`;
+                    select.appendChild(option);
+                });
+
+            } catch (error) {
+                select.innerHTML = `<option value="">Gagal memuat: ${error.message}</option>`;
+            }
+
+        }
+
+
+        // ---- JADIKAN CURRENTLY LISTENING ----
+
+        document.getElementById("submit-current-music-btn").addEventListener("click", async () => {
+
+            const musicDocId = document.getElementById("m-current-select").value;
+
+            if (!musicDocId) {
+                currentMusicStatus.textContent = "Pilih lagu dulu.";
+                currentMusicStatus.className = "admin-status error";
+                return;
+            }
+
+            currentMusicStatus.textContent = "Menyimpan...";
+            currentMusicStatus.className = "admin-status";
+
+            try {
+
+                // Matikan status currently di lagu lain dulu
+                const currentlyQuery = query(
+                    collection(db, "music"),
+                    where("status", "==", "currently")
+                );
+
+                const currentlySnapshot = await getDocs(currentlyQuery);
+
+                for (const docSnap of currentlySnapshot.docs) {
+                    await updateDoc(docSnap.ref, { status: "library" });
+                }
+
+                // Set lagu yang dipilih jadi currently
+                await updateDoc(doc(db, "music", musicDocId), { status: "currently" });
+
+                currentMusicStatus.textContent = "Berhasil! Ini sekarang jadi Currently Listening.";
+                currentMusicStatus.className = "admin-status success";
+
+            } catch (error) {
+                currentMusicStatus.textContent = "Gagal menyimpan: " + error.message;
+                currentMusicStatus.className = "admin-status error";
             }
 
         });
