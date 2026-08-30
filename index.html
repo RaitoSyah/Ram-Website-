@@ -287,24 +287,11 @@
         Journal
     </h2>
 
-    <article>
-
-        <h3>
-            31 July 2026
-        </h3>
-
-        <p>
-            Hari ini aku mulai membuat website pribadiku sendiri.
+    <div id="latest-journal">
+        <p style="color:var(--text-light); font-size:14px;">
+            Memuat journal terbaru...
         </p>
-
-        <a
-            class="back-link"
-            href="journal/index.html"
-        >
-            Read Journal →
-        </a>
-
-    </article>
+    </div>
 
 </section>
 
@@ -384,6 +371,77 @@
         </p>
 
     </footer>
+
+
+    <script type="module">
+
+        import { db } from "./firebase-config.js";
+
+        import {
+            collection,
+            query,
+            orderBy,
+            limit,
+            getDocs
+        } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+
+        const latestJournalEl = document.getElementById("latest-journal");
+
+
+        function formatDate(timestamp) {
+            if (!timestamp) return "";
+            return timestamp.toDate().toLocaleDateString("id-ID", {
+                day: "numeric", month: "long", year: "numeric"
+            });
+        }
+
+
+        async function loadLatestJournal() {
+
+            try {
+
+                const q = query(
+                    collection(db, "journal"),
+                    orderBy("createdAt", "desc"),
+                    limit(1)
+                );
+
+                const snapshot = await getDocs(q);
+
+                if (snapshot.empty) {
+                    latestJournalEl.innerHTML = `
+                        <article>
+                            <p>Belum ada journal. Journal ini tidak harus diperbarui setiap hari kok. 😌</p>
+                        </article>
+                    `;
+                    return;
+                }
+
+                const data = snapshot.docs[0].data();
+
+                latestJournalEl.innerHTML = `
+                    <article>
+                        <h3>${data.mood || ""} ${formatDate(data.createdAt)}</h3>
+                        <p><strong>${data.title}</strong></p>
+                        <p>${data.content}</p>
+                        <a class="back-link" href="journal/index.html">Read Journal →</a>
+                    </article>
+                `;
+
+            } catch (error) {
+                latestJournalEl.innerHTML = `
+                    <p style="color:#e53e3e; font-size:14px;">
+                        Gagal memuat: ${error.message}
+                    </p>
+                `;
+            }
+
+        }
+
+        loadLatestJournal();
+
+    </script>
 
 
 </body>
