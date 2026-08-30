@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Loading... - Ramdhan's Corner</title>
+
+    <link rel="stylesheet" href="../style.css">
+
+    <style>
+
+        /* =========================
+           ARTICLE PHOTOS
+        ========================= */
+
+        .article-photos {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 12px;
+            margin: 20px 0 30px;
+        }
+
+        .article-photo {
+            overflow: hidden;
+            border-radius: 14px;
+            background: var(--surface-soft);
+        }
+
+        .article-photo img {
+            width: 100%;
+            max-height: 420px;
+            object-fit: cover;
+            display: block;
+        }
+
+
+        /* =========================
+           REFERENCES
+        ========================= */
+
+        .references {
+            margin-top: 35px;
+        }
+
+        .reference-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .reference-card {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 14px 16px;
+            background: var(--surface-soft);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            text-decoration: none;
+            color: var(--text);
+            transition: 0.2s;
+        }
+
+        .reference-card:hover {
+            border-color: var(--accent);
+            transform: translateY(-2px);
+        }
+
+        .reference-icon {
+            width: 38px;
+            height: 38px;
+            min-width: 38px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            font-size: 18px;
+            background: var(--accent);
+            color: #ffffff;
+        }
+
+        .reference-icon.instagram { background: #E1306C; }
+        .reference-icon.youtube   { background: #FF0000; }
+        .reference-icon.journal   { background: #4A5568; }
+        .reference-icon.article   { background: var(--accent); }
+        .reference-icon.other     { background: var(--text-light); }
+
+        .reference-info { flex: 1; min-width: 0; }
+
+        .reference-info .reference-title {
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .reference-info .reference-type {
+            font-size: 12px;
+            color: var(--text-light);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+    <header>
+
+        <h1>Ramdhan's Corner</h1>
+
+        <nav>
+            <a href="../index.html">Home</a>
+            <a href="index.html">Writings</a>
+        </nav>
+
+    </header>
+
+
+    <main>
+
+        <article class="full-article" id="article-content">
+
+            <p style="color:var(--text-light); font-size:14px;">
+                Memuat tulisan...
+            </p>
+
+        </article>
+
+    </main>
+
+
+    <footer>
+        <p>© 2026 Ramdhan</p>
+    </footer>
+
+
+    <script type="module">
+
+        import { db } from "../firebase-config.js";
+
+        import {
+            doc,
+            getDoc
+        } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+
+        const params = new URLSearchParams(window.location.search);
+        const articleId = params.get("id");
+
+        const contentEl = document.getElementById("article-content");
+
+
+        const REFERENCE_ICONS = {
+            instagram: "📷",
+            youtube: "▶",
+            journal: "📄",
+            article: "📄",
+            other: "🔗"
+        };
+
+
+        async function loadArticle() {
+
+            if (!articleId) {
+                contentEl.innerHTML = `<p>Tulisan tidak ditemukan.</p>`;
+                return;
+            }
+
+            try {
+
+                const snap = await getDoc(doc(db, "writings", articleId));
+
+                if (!snap.exists()) {
+                    contentEl.innerHTML = `<p>Tulisan tidak ditemukan.</p>`;
+                    return;
+                }
+
+                const data = snap.data();
+
+                document.title = `${data.title} - Ramdhan's Corner`;
+
+                // Foto-foto
+                let photosHtml = "";
+                if (data.photos && data.photos.length > 0) {
+                    photosHtml = `<div class="article-photos">`;
+                    data.photos.forEach(url => {
+                        photosHtml += `
+                            <figure class="article-photo">
+                                <img src="${url}" alt="${data.title}">
+                            </figure>
+                        `;
+                    });
+                    photosHtml += `</div>`;
+                }
+
+                // Isi tulisan (pisah per baris jadi paragraf)
+                const paragraphs = data.content
+                    .split("\n")
+                    .filter(p => p.trim())
+                    .map(p => `<p>${p}</p>`)
+                    .join("");
+
+                // Referensi
+                let referencesHtml = "";
+                if (data.references && data.references.length > 0) {
+                    referencesHtml = `
+                        <div class="references">
+                            <h3>Referensi</h3>
+                            <div class="reference-list">
+                    `;
+                    data.references.forEach(ref => {
+                        const icon = REFERENCE_ICONS[ref.type] || "🔗";
+                        referencesHtml += `
+                            <a href="${ref.url}" target="_blank" rel="noopener" class="reference-card">
+                                <div class="reference-icon ${ref.type}">${icon}</div>
+                                <div class="reference-info">
+                                    <p class="reference-title">${ref.title}</p>
+                                    <p class="reference-type">${ref.type}</p>
+                                </div>
+                            </a>
+                        `;
+                    });
+                    referencesHtml += `</div></div>`;
+                }
+
+                const categoryLabel = data.category
+                    ? data.category.toUpperCase()
+                    : "";
+
+                contentEl.innerHTML = `
+                    <p class="writing-category">${categoryLabel}</p>
+                    <h2>${data.title}</h2>
+                    ${photosHtml}
+                    ${paragraphs}
+                    ${referencesHtml}
+                    <p style="margin-top:30px;">
+                        <a class="back-link" href="${data.category}.html">← Back to ${categoryLabel}</a>
+                    </p>
+                `;
+
+            } catch (error) {
+                contentEl.innerHTML = `<p style="color:#e53e3e;">Gagal memuat tulisan: ${error.message}</p>`;
+            }
+
+        }
+
+        loadArticle();
+
+    </script>
+
+</body>
+
+</html>
