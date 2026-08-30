@@ -115,6 +115,22 @@
         .reference-input-row select { flex: 0 0 110px; }
         .reference-input-row input { flex: 1; }
 
+        .remove-reference-btn {
+            flex: 0 0 36px;
+            background: transparent;
+            border: 1px solid var(--border);
+            color: #e53e3e;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .remove-reference-btn:hover {
+            background: #e53e3e;
+            color: #fff;
+            border-color: #e53e3e;
+        }
+
         #login-box, #admin-panel, #visitor-panel {
             display: none;
         }
@@ -249,6 +265,7 @@
                         </select>
                         <input type="text" class="ref-title" placeholder="Judul referensi">
                         <input type="text" class="ref-url" placeholder="URL">
+                        <button type="button" class="remove-reference-btn">✕</button>
                     </div>
                 </div>
 
@@ -395,9 +412,33 @@
                 </select>
                 <input type="text" class="ref-title" placeholder="Judul referensi">
                 <input type="text" class="ref-url" placeholder="URL">
+                <button type="button" class="remove-reference-btn">✕</button>
             `;
 
             container.appendChild(row);
+
+        });
+
+
+        // ---- HAPUS SATU BARIS REFERENSI ----
+        // Pakai event delegation biar tombol yang ditambah belakangan juga kepasang listenernya
+
+        document.getElementById("reference-inputs").addEventListener("click", (e) => {
+
+            if (!e.target.classList.contains("remove-reference-btn")) return;
+
+            const container = document.getElementById("reference-inputs");
+            const rows = container.querySelectorAll(".reference-input-row");
+
+            // Kalau cuma tinggal 1 baris, jangan dihapus total —
+            // cukup kosongin isinya biar form tetap ada minimal 1 baris
+            if (rows.length <= 1) {
+                e.target.closest(".reference-input-row").querySelector(".ref-title").value = "";
+                e.target.closest(".reference-input-row").querySelector(".ref-url").value = "";
+                return;
+            }
+
+            e.target.closest(".reference-input-row").remove();
 
         });
 
@@ -466,6 +507,7 @@
                         </select>
                         <input type="text" class="ref-title" placeholder="Judul referensi">
                         <input type="text" class="ref-url" placeholder="URL">
+                        <button type="button" class="remove-reference-btn">✕</button>
                     </div>
                 `;
 
