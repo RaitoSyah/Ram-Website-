@@ -184,27 +184,11 @@
 
             <h2>Latest Writing</h2>
 
-            <article class="writing-card">
-
-                <p class="writing-category">
-                    PSYCHOLOGY
+            <div id="latest-writing">
+                <p style="color:var(--text-light); font-size:14px;">
+                    Memuat tulisan terbaru...
                 </p>
-
-                <h3>
-                    Kenapa Kita Bisa Terikat dengan Seseorang?
-                </h3>
-
-                <p>
-                    Sedikit membahas attachment,
-                    kedekatan emosional, dan bagaimana
-                    manusia bisa merasa terhubung dengan orang lain.
-                </p>
-
-                <a href="attachment.html">
-                    Read this →
-                </a>
-
-            </article>
+            </div>
 
         </section>
 
@@ -232,6 +216,75 @@
         </p>
 
     </footer>
+
+
+    <script type="module">
+
+        import { db } from "../firebase-config.js";
+
+        import {
+            collection,
+            query,
+            orderBy,
+            limit,
+            getDocs
+        } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+
+        const latestEl = document.getElementById("latest-writing");
+
+
+        async function loadLatest() {
+
+            try {
+
+                const q = query(
+                    collection(db, "writings"),
+                    orderBy("createdAt", "desc"),
+                    limit(1)
+                );
+
+                const snapshot = await getDocs(q);
+
+                if (snapshot.empty) {
+                    latestEl.innerHTML = `
+                        <article class="writing-card">
+                            <h3>Belum Ada Tulisan</h3>
+                            <p>Tulisan pertamaku akan muncul di sini.</p>
+                        </article>
+                    `;
+                    return;
+                }
+
+                const doc = snapshot.docs[0];
+                const data = doc.data();
+
+                const categoryLabel = data.category
+                    ? data.category.toUpperCase()
+                    : "";
+
+                latestEl.innerHTML = `
+                    <article class="writing-card">
+                        <p class="writing-category">${categoryLabel}</p>
+                        <h3>${data.title}</h3>
+                        <p>${data.description}</p>
+                        <a href="article.html?id=${doc.id}">Read this →</a>
+                    </article>
+                `;
+
+            } catch (error) {
+                latestEl.innerHTML = `
+                    <p style="color:#e53e3e; font-size:14px;">
+                        Gagal memuat: ${error.message}
+                    </p>
+                `;
+            }
+
+        }
+
+        loadLatest();
+
+    </script>
 
 
 </body>
