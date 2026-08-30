@@ -14,6 +14,76 @@
 
     <link rel="stylesheet" href="../style.css">
 
+    <style>
+
+        .journal-entry {
+            padding: 16px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .journal-entry:last-child {
+            border-bottom: none;
+        }
+
+        .journal-meta {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+
+        .journal-mood {
+            font-size: 18px;
+        }
+
+        .journal-tags {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+        }
+
+        .journal-tag {
+            font-size: 12px;
+            padding: 3px 10px;
+            border-radius: 20px;
+            background: var(--surface-soft);
+            color: var(--text-light);
+        }
+
+        .journal-photos {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 8px;
+            margin: 10px 0;
+        }
+
+        .journal-photos img {
+            width: 100%;
+            max-height: 220px;
+            object-fit: cover;
+            border-radius: 10px;
+            display: block;
+        }
+
+        #load-more-btn {
+            display: block;
+            margin: 20px auto 0;
+            padding: 10px 24px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--surface-soft);
+            color: var(--text);
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        #load-more-btn:hover {
+            border-color: var(--accent);
+        }
+
+    </style>
+
 </head>
 
 
@@ -82,63 +152,15 @@
                 Recent Entries
             </h2>
 
-
-            <!-- ENTRY 01 -->
-
-            <article>
-
-                <p class="article-date">
-                    01 August 2026
+            <div id="journal-list">
+                <p style="color:var(--text-light); font-size:14px;">
+                    Memuat entries...
                 </p>
+            </div>
 
-                <h3>
-                    Starting This Website
-                </h3>
-
-                <p>
-
-                    Hari ini aku melanjutkan pembuatan
-                    website pribadiku sendiri.
-
-                    Awalnya cuma kepikiran buat punya
-                    tempat untuk menaruh tulisan dan
-                    sedikit tentang diriku.
-
-                    Tapi ternyata malah jadi mikirin
-                    struktur halaman, warna, navigasi,
-                    CSS, dan segala macamnya. 💀
-
-                </p>
-
-            </article>
-
-
-            <!-- ENTRY 02 -->
-
-            <article>
-
-                <p class="article-date">
-                    31 July 2026
-                </p>
-
-                <h3>
-                    The Beginning
-                </h3>
-
-                <p>
-
-                    Hari ini aku mulai membuat website
-                    pribadiku sendiri.
-
-                    Masih sederhana, tapi setidaknya
-                    sekarang sudah punya tempat untuk
-                    menaruh berbagai macam hal yang
-                    ingin kutulis.
-
-                </p>
-
-            </article>
-
+            <button id="load-more-btn" style="display:none;">
+                Load More
+            </button>
 
         </section>
 
@@ -156,19 +178,14 @@
             </h2>
 
             <p>
-
                 Journal ini tidak harus diperbarui
                 setiap hari.
-
             </p>
 
             <p>
-
                 Kalau ada sesuatu yang ingin kusimpan,
                 aku akan menulisnya di sini.
-
                 Kalau tidak ada, ya tidak ada. 😌
-
             </p>
 
         </section>
@@ -177,14 +194,12 @@
         <!-- BACK -->
 
         <p>
-
             <a
                 class="back-link"
                 href="../index.html"
             >
                 ← Back to Home
             </a>
-
         </p>
 
 
@@ -194,13 +209,146 @@
     <!-- FOOTER -->
 
     <footer>
-
-        <p>
-            © 2026 Ramdhan
-        </p>
-
+        <p>© 2026 Ramdhan</p>
     </footer>
 
+
+    <script type="module">
+
+        import { db } from "../firebase-config.js";
+
+        import {
+            collection,
+            query,
+            orderBy,
+            limit,
+            startAfter,
+            getDocs
+        } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+
+        const PAGE_SIZE = 10;
+
+        const listEl = document.getElementById("journal-list");
+        const loadMoreBtn = document.getElementById("load-more-btn");
+
+        let lastDoc = null;
+        let isFirstLoad = true;
+
+
+        function formatDate(timestamp) {
+            if (!timestamp) return "";
+            return timestamp.toDate().toLocaleDateString("id-ID", {
+                day: "numeric", month: "long", year: "numeric"
+            });
+        }
+
+
+        function renderEntry(data) {
+
+            const entry = document.createElement("article");
+            entry.className = "journal-entry";
+
+            let photosHtml = "";
+            if (data.photos && data.photos.length > 0) {
+                photosHtml = `<div class="journal-photos">`;
+                data.photos.forEach(url => {
+                    photosHtml += `<img src="${url}" alt="${data.title}">`;
+                });
+                photosHtml += `</div>`;
+            }
+
+            let tagsHtml = "";
+            if (data.tags && data.tags.length > 0) {
+                tagsHtml = `<div class="journal-tags">`;
+                data.tags.forEach(tag => {
+                    tagsHtml += `<span class="journal-tag">#${tag}</span>`;
+                });
+                tagsHtml += `</div>`;
+            }
+
+            entry.innerHTML = `
+                <div class="journal-meta">
+                    <span class="journal-mood">${data.mood || ""}</span>
+                    <p class="article-date" style="margin:0;">${formatDate(data.createdAt)}</p>
+                </div>
+                <h3>${data.title}</h3>
+                ${photosHtml}
+                <p>${data.content}</p>
+                ${tagsHtml}
+            `;
+
+            listEl.appendChild(entry);
+
+        }
+
+
+        async function loadEntries() {
+
+            try {
+
+                let q;
+
+                if (lastDoc) {
+                    q = query(
+                        collection(db, "journal"),
+                        orderBy("createdAt", "desc"),
+                        startAfter(lastDoc),
+                        limit(PAGE_SIZE)
+                    );
+                } else {
+                    q = query(
+                        collection(db, "journal"),
+                        orderBy("createdAt", "desc"),
+                        limit(PAGE_SIZE)
+                    );
+                }
+
+                const snapshot = await getDocs(q);
+
+                if (isFirstLoad) {
+                    listEl.innerHTML = "";
+                    isFirstLoad = false;
+                }
+
+                if (snapshot.empty && !lastDoc) {
+                    listEl.innerHTML = `
+                        <p style="color:var(--text-light); font-size:14px;">
+                            Belum ada entry. Journal ini tidak harus diperbarui setiap hari kok. 😌
+                        </p>
+                    `;
+                    loadMoreBtn.style.display = "none";
+                    return;
+                }
+
+                snapshot.forEach((doc) => {
+                    renderEntry(doc.data());
+                });
+
+                if (snapshot.docs.length > 0) {
+                    lastDoc = snapshot.docs[snapshot.docs.length - 1];
+                }
+
+                // Kalau hasil kurang dari PAGE_SIZE, berarti udah habis
+                loadMoreBtn.style.display =
+                    snapshot.docs.length < PAGE_SIZE ? "none" : "block";
+
+            } catch (error) {
+                listEl.innerHTML = `
+                    <p style="color:#e53e3e; font-size:14px;">
+                        Gagal memuat journal: ${error.message}
+                    </p>
+                `;
+            }
+
+        }
+
+
+        loadMoreBtn.addEventListener("click", loadEntries);
+
+        loadEntries();
+
+    </script>
 
 </body>
 

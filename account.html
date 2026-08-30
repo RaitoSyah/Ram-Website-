@@ -287,6 +287,56 @@
 
 
         <!-- ==========================================
+             FORM TAMBAH JOURNAL
+        =========================================== -->
+
+        <section id="journal-panel" class="admin-box">
+
+            <h2>Tambah Journal Entry</h2>
+
+            <div class="admin-field">
+                <label for="j-title">Judul</label>
+                <input type="text" id="j-title" placeholder="Judul singkat">
+            </div>
+
+            <div class="admin-field">
+                <label for="j-content">Isi (singkat, 3-4 kalimat)</label>
+                <textarea id="j-content" placeholder="Funfact hari ini..."></textarea>
+            </div>
+
+            <div class="admin-field">
+                <label for="j-mood">Mood</label>
+                <select id="j-mood">
+                    <option value="😌">😌 Santai</option>
+                    <option value="🔥">🔥 Semangat</option>
+                    <option value="😤">😤 Kesel</option>
+                    <option value="😴">😴 Capek</option>
+                    <option value="🤔">🤔 Mikir</option>
+                    <option value="😆">😆 Seneng</option>
+                    <option value="😭">😭 Absurd</option>
+                </select>
+            </div>
+
+            <div class="admin-field">
+                <label for="j-tags">Tags (opsional, pisah pakai koma)</label>
+                <input type="text" id="j-tags" placeholder="coding, sekolah, random">
+            </div>
+
+            <div class="admin-field">
+                <label for="j-photos">Link Foto (opsional, satu baris satu link)</label>
+                <textarea id="j-photos" placeholder="https://.../foto1.jpg"></textarea>
+            </div>
+
+            <button class="admin-btn" id="submit-journal-btn">
+                Submit Journal
+            </button>
+
+            <p class="admin-status" id="journal-status"></p>
+
+        </section>
+
+
+        <!-- ==========================================
              VISITOR PANEL (kalau yang login BUKAN admin)
         =========================================== -->
 
@@ -339,9 +389,11 @@
 
         const loginBox = document.getElementById("login-box");
         const adminPanel = document.getElementById("admin-panel");
+        const journalPanel = document.getElementById("journal-panel");
         const visitorPanel = document.getElementById("visitor-panel");
         const loginStatus = document.getElementById("login-status");
         const writingStatus = document.getElementById("writing-status");
+        const journalStatus = document.getElementById("journal-status");
 
 
         // ---- CEK STATUS LOGIN & TENTUKAN ROLE ----
@@ -350,6 +402,7 @@
 
             loginBox.style.display = "none";
             adminPanel.style.display = "none";
+            journalPanel.style.display = "none";
             visitorPanel.style.display = "none";
 
             if (!user) {
@@ -359,6 +412,7 @@
 
             if (user.email === ADMIN_EMAIL) {
                 adminPanel.style.display = "block";
+                journalPanel.style.display = "block";
                 document.getElementById("admin-avatar").src = user.photoURL || "";
                 document.getElementById("admin-name").textContent = user.displayName || user.email;
             } else {
@@ -523,6 +577,61 @@
             } catch (error) {
                 writingStatus.textContent = "Gagal menyimpan: " + error.message;
                 writingStatus.className = "admin-status error";
+            }
+
+        });
+
+
+        // ---- SUBMIT JOURNAL ----
+
+        document.getElementById("submit-journal-btn").addEventListener("click", async () => {
+
+            const title = document.getElementById("j-title").value.trim();
+            const content = document.getElementById("j-content").value.trim();
+            const mood = document.getElementById("j-mood").value;
+
+            const tagsRaw = document.getElementById("j-tags").value.trim();
+            const tags = tagsRaw
+                ? tagsRaw.split(",").map(t => t.trim()).filter(t => t)
+                : [];
+
+            const photosRaw = document.getElementById("j-photos").value.trim();
+            const photos = photosRaw
+                ? photosRaw.split("\n").map(p => p.trim()).filter(p => p)
+                : [];
+
+            if (!title || !content) {
+                journalStatus.textContent = "Judul dan isi wajib diisi.";
+                journalStatus.className = "admin-status error";
+                return;
+            }
+
+            journalStatus.textContent = "Menyimpan...";
+            journalStatus.className = "admin-status";
+
+            try {
+
+                await addDoc(collection(db, "journal"), {
+                    title,
+                    content,
+                    mood,
+                    tags,
+                    photos,
+                    createdAt: serverTimestamp()
+                });
+
+                journalStatus.textContent = "Berhasil disimpan!";
+                journalStatus.className = "admin-status success";
+
+                document.getElementById("j-title").value = "";
+                document.getElementById("j-content").value = "";
+                document.getElementById("j-tags").value = "";
+                document.getElementById("j-photos").value = "";
+                document.getElementById("j-mood").selectedIndex = 0;
+
+            } catch (error) {
+                journalStatus.textContent = "Gagal menyimpan: " + error.message;
+                journalStatus.className = "admin-status error";
             }
 
         });
