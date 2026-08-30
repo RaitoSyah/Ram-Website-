@@ -15,8 +15,8 @@ import {
 
 function formatDate(timestamp) {
     if (!timestamp) return "";
-    return timestamp.toDate().toLocaleDateString("id-ID", {
-        day: "numeric", month: "long", year: "numeric"
+    return timestamp.toDate().toLocaleTimeString("id-ID", {
+        hour: "2-digit", minute: "2-digit"
     });
 }
 
@@ -138,7 +138,7 @@ async function loadGames() {
                     </div>
                     <div class="other-game-info">
                         <h3>${game.name}</h3>
-                        <p>Dimainkan: ${formatDate(session.startedAt)}</p>
+                        <p>Dimainkan pukul ${formatDate(session.startedAt)}</p>
                     </div>
                 `;
 
