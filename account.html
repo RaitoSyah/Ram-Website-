@@ -337,6 +337,71 @@
 
 
         <!-- ==========================================
+             FORM TAMBAH GAME
+        =========================================== -->
+
+        <section id="game-panel" class="admin-box">
+
+            <h2>Tambah / Update Game</h2>
+
+            <div class="admin-field">
+                <label for="g-name">Nama Game</label>
+                <input type="text" id="g-name" placeholder="Minecraft">
+            </div>
+
+            <div class="admin-field">
+                <label for="g-category">Kategori</label>
+                <input type="text" id="g-category" placeholder="SANDBOX · SURVIVAL">
+            </div>
+
+            <div class="admin-field">
+                <label for="g-image">Link Gambar</label>
+                <input type="text" id="g-image" placeholder="https://.../game.jpg">
+            </div>
+
+            <div class="admin-field">
+                <label for="g-description">Deskripsi</label>
+                <textarea id="g-description" placeholder="Deskripsi singkat game ini"></textarea>
+            </div>
+
+            <div class="admin-field">
+                <label for="g-nickname">Nickname (opsional)</label>
+                <input type="text" id="g-nickname" placeholder="Nickname in-game kamu">
+            </div>
+
+            <div class="admin-field">
+                <label for="g-gameid">ID Game (opsional)</label>
+                <input type="text" id="g-gameid" placeholder="ID/UID buat di-add teman">
+            </div>
+
+            <div class="admin-field">
+                <label for="g-status">Status</label>
+                <select id="g-status">
+                    <option value="currently">Currently Playing</option>
+                    <option value="inactive">Sudah Tidak Dimainkan</option>
+                </select>
+            </div>
+
+            <div class="admin-field">
+                <label for="g-lastplayed">Terakhir Dimainkan</label>
+                <input type="date" id="g-lastplayed">
+            </div>
+
+            <div class="admin-field">
+                <label for="g-link">Link Game (opsional)</label>
+                <input type="text" id="g-link" placeholder="https://...">
+            </div>
+
+            <button class="admin-btn" id="submit-game-btn">
+                Submit Game
+            </button>
+
+            <p class="admin-status" id="game-status"></p>
+
+        </section>
+
+
+        <!-- ==========================================
              VISITOR PANEL (kalau yang login BUKAN admin)
         =========================================== -->
 
@@ -390,10 +455,12 @@
         const loginBox = document.getElementById("login-box");
         const adminPanel = document.getElementById("admin-panel");
         const journalPanel = document.getElementById("journal-panel");
+        const gamePanel = document.getElementById("game-panel");
         const visitorPanel = document.getElementById("visitor-panel");
         const loginStatus = document.getElementById("login-status");
         const writingStatus = document.getElementById("writing-status");
         const journalStatus = document.getElementById("journal-status");
+        const gameStatus = document.getElementById("game-status");
 
 
         // ---- CEK STATUS LOGIN & TENTUKAN ROLE ----
@@ -403,6 +470,7 @@
             loginBox.style.display = "none";
             adminPanel.style.display = "none";
             journalPanel.style.display = "none";
+            gamePanel.style.display = "none";
             visitorPanel.style.display = "none";
 
             if (!user) {
@@ -413,6 +481,7 @@
             if (user.email === ADMIN_EMAIL) {
                 adminPanel.style.display = "block";
                 journalPanel.style.display = "block";
+                gamePanel.style.display = "block";
                 document.getElementById("admin-avatar").src = user.photoURL || "";
                 document.getElementById("admin-name").textContent = user.displayName || user.email;
             } else {
@@ -632,6 +701,66 @@
             } catch (error) {
                 journalStatus.textContent = "Gagal menyimpan: " + error.message;
                 journalStatus.className = "admin-status error";
+            }
+
+        });
+
+
+        // ---- SUBMIT GAME ----
+
+        document.getElementById("submit-game-btn").addEventListener("click", async () => {
+
+            const name = document.getElementById("g-name").value.trim();
+            const category = document.getElementById("g-category").value.trim();
+            const image = document.getElementById("g-image").value.trim();
+            const description = document.getElementById("g-description").value.trim();
+            const nickname = document.getElementById("g-nickname").value.trim();
+            const gameId = document.getElementById("g-gameid").value.trim();
+            const status = document.getElementById("g-status").value;
+            const lastPlayed = document.getElementById("g-lastplayed").value;
+            const link = document.getElementById("g-link").value.trim();
+
+            if (!name || !category || !lastPlayed) {
+                gameStatus.textContent = "Nama, kategori, dan tanggal terakhir main wajib diisi.";
+                gameStatus.className = "admin-status error";
+                return;
+            }
+
+            gameStatus.textContent = "Menyimpan...";
+            gameStatus.className = "admin-status";
+
+            try {
+
+                await addDoc(collection(db, "games"), {
+                    name,
+                    category,
+                    image,
+                    description,
+                    nickname,
+                    gameId,
+                    status,
+                    statusText: status === "currently" ? "🟢 Currently Playing" : "",
+                    lastPlayed,
+                    link,
+                    createdAt: serverTimestamp()
+                });
+
+                gameStatus.textContent = "Berhasil disimpan!";
+                gameStatus.className = "admin-status success";
+
+                document.getElementById("g-name").value = "";
+                document.getElementById("g-category").value = "";
+                document.getElementById("g-image").value = "";
+                document.getElementById("g-description").value = "";
+                document.getElementById("g-nickname").value = "";
+                document.getElementById("g-gameid").value = "";
+                document.getElementById("g-lastplayed").value = "";
+                document.getElementById("g-link").value = "";
+                document.getElementById("g-status").selectedIndex = 0;
+
+            } catch (error) {
+                gameStatus.textContent = "Gagal menyimpan: " + error.message;
+                gameStatus.className = "admin-status error";
             }
 
         });
