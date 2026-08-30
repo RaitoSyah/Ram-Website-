@@ -141,6 +141,111 @@
             font-weight: bold;
         }
 
+
+        /* =========================
+           COMMENTS
+        ========================= */
+
+        .comments-section {
+            margin-top: 45px;
+            padding-top: 30px;
+            border-top: 1px solid var(--border);
+        }
+
+        .comments-section h3 {
+            font-size: 18px;
+            margin-bottom: 16px;
+        }
+
+        .comment-form {
+            display: none;
+            gap: 10px;
+            margin-bottom: 24px;
+        }
+
+        .comment-form textarea {
+            width: 100%;
+            min-height: 70px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--surface-soft);
+            color: var(--text);
+            font-family: inherit;
+            font-size: 14px;
+            resize: vertical;
+            margin-bottom: 8px;
+        }
+
+        .comment-form button {
+            padding: 10px 18px;
+            border-radius: 10px;
+            border: none;
+            background: var(--accent);
+            color: #fff;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .comment-login-prompt {
+            font-size: 14px;
+            color: var(--text-light);
+            margin-bottom: 20px;
+        }
+
+        .comment-login-prompt a {
+            color: var(--accent);
+            font-weight: bold;
+        }
+
+        .comment-item {
+            display: flex;
+            gap: 12px;
+            padding: 14px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .comment-item img {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .comment-body {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .comment-name {
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .comment-text {
+            font-size: 14px;
+            margin: 4px 0;
+            line-height: 1.5;
+        }
+
+        .comment-meta {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 12px;
+            color: var(--text-light);
+        }
+
+        .comment-delete-btn {
+            background: none;
+            border: none;
+            color: #e53e3e;
+            font-size: 12px;
+            cursor: pointer;
+            padding: 0;
+        }
+
     </style>
 
 </head>
@@ -170,6 +275,32 @@
 
         </article>
 
+
+        <!-- ==========================================
+             COMMENTS
+        =========================================== -->
+
+        <section class="comments-section">
+
+            <h3>Comments</h3>
+
+            <p class="comment-login-prompt" id="comment-login-prompt">
+                <a href="../account.html">Login dengan Google</a> untuk ikut komentar.
+            </p>
+
+            <div class="comment-form" id="comment-form">
+                <textarea id="comment-input" placeholder="Tulis komentar..."></textarea>
+                <button id="comment-submit-btn">Kirim Komentar</button>
+            </div>
+
+            <div id="comment-list">
+                <p style="color:var(--text-light); font-size:14px;">
+                    Memuat komentar...
+                </p>
+            </div>
+
+        </section>
+
     </main>
 
 
@@ -180,18 +311,40 @@
 
     <script type="module">
 
-        import { db } from "../firebase-config.js";
+        import { db, auth } from "../firebase-config.js";
 
         import {
             doc,
-            getDoc
+            getDoc,
+            collection,
+            query,
+            where,
+            orderBy,
+            addDoc,
+            deleteDoc,
+            onSnapshot,
+            serverTimestamp
         } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
+        import {
+            onAuthStateChanged
+        } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+
+
+        const ADMIN_EMAIL = "im.raito.id@gmail.com";
 
         const params = new URLSearchParams(window.location.search);
         const articleId = params.get("id");
 
         const contentEl = document.getElementById("article-content");
+
+        const loginPrompt = document.getElementById("comment-login-prompt");
+        const commentForm = document.getElementById("comment-form");
+        const commentInput = document.getElementById("comment-input");
+        const commentSubmitBtn = document.getElementById("comment-submit-btn");
+        const commentListEl = document.getElementById("comment-list");
+
+        let currentUser = null;
 
 
         const REFERENCE_ICONS = {
@@ -292,6 +445,130 @@
         }
 
         loadArticle();
+
+
+        // ==========================================
+        // COMMENTS LOGIC
+        // ==========================================
+
+        onAuthStateChanged(auth, (user) => {
+
+            currentUser = user;
+
+            if (user) {
+                loginPrompt.style.display = "none";
+                commentForm.style.display = "flex";
+                commentForm.style.flexDirection = "column";
+            } else {
+                loginPrompt.style.display = "block";
+                commentForm.style.display = "none";
+            }
+
+        });
+
+
+        function renderComments(snapshot) {
+
+            if (snapshot.empty) {
+                commentListEl.innerHTML = `
+                    <p style="color:var(--text-light); font-size:14px;">
+                        Belum ada komentar. Jadi yang pertama!
+                    </p>
+                `;
+                return;
+            }
+
+            commentListEl.innerHTML = "";
+
+            snapshot.forEach((docSnap) => {
+
+                const c = docSnap.data();
+
+                const isAdmin = currentUser && currentUser.email === ADMIN_EMAIL;
+
+                const date = c.createdAt
+                    ? c.createdAt.toDate().toLocaleDateString("id-ID", {
+                        day: "numeric", month: "short", year: "numeric"
+                      })
+                    : "";
+
+                const item = document.createElement("div");
+                item.className = "comment-item";
+
+                item.innerHTML = `
+                    <img src="${c.userPhoto || ''}" alt="${c.userName}">
+                    <div class="comment-body">
+                        <p class="comment-name">${c.userName}</p>
+                        <p class="comment-text">${c.text}</p>
+                        <div class="comment-meta">
+                            <span>${date}</span>
+                            ${isAdmin ? `<button class="comment-delete-btn" data-id="${docSnap.id}">Hapus</button>` : ""}
+                        </div>
+                    </div>
+                `;
+
+                commentListEl.appendChild(item);
+
+            });
+
+            // pasang listener hapus (cuma admin yang punya tombolnya)
+            commentListEl.querySelectorAll(".comment-delete-btn").forEach(btn => {
+                btn.addEventListener("click", async () => {
+                    if (confirm("Hapus komentar ini?")) {
+                        await deleteDoc(doc(db, "comments", btn.dataset.id));
+                    }
+                });
+            });
+
+        }
+
+
+        if (articleId) {
+
+            const commentsQuery = query(
+                collection(db, "comments"),
+                where("articleId", "==", articleId),
+                orderBy("createdAt", "desc")
+            );
+
+            onSnapshot(commentsQuery, renderComments, (error) => {
+                commentListEl.innerHTML = `
+                    <p style="color:#e53e3e; font-size:14px;">
+                        Gagal memuat komentar: ${error.message}
+                    </p>
+                `;
+            });
+
+        }
+
+
+        commentSubmitBtn.addEventListener("click", async () => {
+
+            const text = commentInput.value.trim();
+
+            if (!text || !currentUser || !articleId) return;
+
+            commentSubmitBtn.disabled = true;
+
+            try {
+
+                await addDoc(collection(db, "comments"), {
+                    articleId: articleId,
+                    text: text,
+                    userName: currentUser.displayName || currentUser.email,
+                    userPhoto: currentUser.photoURL || "",
+                    createdAt: serverTimestamp()
+                });
+
+                commentInput.value = "";
+
+            } catch (error) {
+                alert("Gagal mengirim komentar: " + error.message);
+            }
+
+            commentSubmitBtn.disabled = false;
+
+        });
 
     </script>
 
