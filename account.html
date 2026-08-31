@@ -504,12 +504,12 @@
             </div>
 
             <div class="admin-field">
-                <label for="w-waifu-icon">Link Icon (rasio 1:1, buat tampil di grid)</label>
-                <input type="text" id="w-waifu-icon" placeholder="https://.../icon.jpg">
+                <label for="w-waifu-icon">Link Icon (satu baris satu link, rasio 1:1, foto pertama jadi cover grid)</label>
+                <textarea id="w-waifu-icon" placeholder="https://.../icon1.jpg"></textarea>
             </div>
 
             <div class="admin-field">
-                <label for="w-waifu-photos">Link Potret (satu baris satu link, full body, buat halaman detail)</label>
+                <label for="w-waifu-photos">Link Potret (satu baris satu link, full body)</label>
                 <textarea id="w-waifu-photos" placeholder="https://.../potret1.jpg"></textarea>
             </div>
 
@@ -1113,10 +1113,14 @@
 
             const name = document.getElementById("w-waifu-name").value.trim();
             const source = document.getElementById("w-waifu-source").value.trim();
-            const icon = document.getElementById("w-waifu-icon").value.trim();
             const bio = document.getElementById("w-waifu-bio").value.trim();
             const whyLike = document.getElementById("w-waifu-why").value.trim();
             const quotes = document.getElementById("w-waifu-quotes").value.trim();
+
+            const iconRaw = document.getElementById("w-waifu-icon").value.trim();
+            const icon = iconRaw
+                ? iconRaw.split("\n").map(p => p.trim()).filter(p => p)
+                : [];
 
             const photosRaw = document.getElementById("w-waifu-photos").value.trim();
             const photos = photosRaw

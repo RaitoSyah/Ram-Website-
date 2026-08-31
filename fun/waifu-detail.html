@@ -20,15 +20,24 @@
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
             gap: 10px;
-            margin: 20px 0 30px;
+            margin: 0 0 30px;
         }
 
         .waifu-photos img {
             width: 100%;
-            max-height: 380px;
-            object-fit: cover;
             border-radius: 14px;
             display: block;
+        }
+
+        .photo-tab-panel[data-panel="icon"] img {
+            aspect-ratio: 1/1;
+            object-fit: cover;
+        }
+
+        .photo-tab-panel[data-panel="potret"] img {
+            max-height: 480px;
+            object-fit: contain;
+            background: var(--surface-soft);
         }
 
         .waifu-source-tag {
@@ -55,6 +64,42 @@
             border-left: 3px solid var(--accent);
             background: var(--surface-soft);
             border-radius: 8px;
+        }
+
+
+        /* =========================
+           PHOTO TABS (Icon / Potret)
+        ========================= */
+
+        .photo-tabs {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 14px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .photo-tab-btn {
+            padding: 10px 18px;
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            font-weight: bold;
+            font-size: 14px;
+            color: var(--text-light);
+            cursor: pointer;
+        }
+
+        .photo-tab-btn.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        .photo-tab-panel {
+            display: none;
+        }
+
+        .photo-tab-panel.active {
+            display: grid;
         }
 
     </style>
@@ -130,13 +175,37 @@
 
                 document.title = `${data.name} - Ramdhan's Corner`;
 
-                let photosHtml = "";
-                if (data.photos && data.photos.length > 0) {
-                    photosHtml = `<div class="waifu-photos">`;
-                    data.photos.forEach(url => {
-                        photosHtml += `<img src="${url}" alt="${data.name}">`;
-                    });
-                    photosHtml += `</div>`;
+                let tabsHtml = "";
+
+                const hasIcon = data.icon && data.icon.length > 0;
+                const hasPhotos = data.photos && data.photos.length > 0;
+
+                if (hasIcon || hasPhotos) {
+
+                    let iconGrid = "";
+                    if (hasIcon) {
+                        data.icon.forEach(url => {
+                            iconGrid += `<img src="${url}" alt="${data.name}">`;
+                        });
+                    }
+
+                    let potretGrid = "";
+                    if (hasPhotos) {
+                        data.photos.forEach(url => {
+                            potretGrid += `<img src="${url}" alt="${data.name}">`;
+                        });
+                    }
+
+                    tabsHtml = `
+                        <div class="photo-tabs">
+                            ${hasIcon ? `<button class="photo-tab-btn active" data-tab="icon">Icon</button>` : ""}
+                            ${hasPhotos ? `<button class="photo-tab-btn ${!hasIcon ? "active" : ""}" data-tab="potret">Potret</button>` : ""}
+                        </div>
+
+                        ${hasIcon ? `<div class="waifu-photos photo-tab-panel active" data-panel="icon">${iconGrid}</div>` : ""}
+                        ${hasPhotos ? `<div class="waifu-photos photo-tab-panel ${!hasIcon ? "active" : ""}" data-panel="potret">${potretGrid}</div>` : ""}
+                    `;
+
                 }
 
                 let bioHtml = "";
@@ -172,7 +241,7 @@
                 contentEl.innerHTML = `
                     <p class="waifu-source-tag">${data.source}</p>
                     <h2>${data.name}</h2>
-                    ${photosHtml}
+                    ${tabsHtml}
                     ${bioHtml}
                     ${whyLikeHtml}
                     ${quotesHtml}
@@ -180,6 +249,21 @@
                         <a class="back-link" href="index.html">← Back to Fun Stuff</a>
                     </p>
                 `;
+
+                // Pasang listener buat tab switcher
+                contentEl.querySelectorAll(".photo-tab-btn").forEach(btn => {
+                    btn.addEventListener("click", () => {
+
+                        const tab = btn.dataset.tab;
+
+                        contentEl.querySelectorAll(".photo-tab-btn").forEach(b => b.classList.remove("active"));
+                        contentEl.querySelectorAll(".photo-tab-panel").forEach(p => p.classList.remove("active"));
+
+                        btn.classList.add("active");
+                        contentEl.querySelector(`.photo-tab-panel[data-panel="${tab}"]`).classList.add("active");
+
+                    });
+                });
 
             } catch (error) {
                 contentEl.innerHTML = `<p style="color:#e53e3e;">Gagal memuat: ${error.message}</p>`;

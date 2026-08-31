@@ -28,13 +28,14 @@ async function loadWaifu() {
         snapshot.forEach((docSnap) => {
 
             const data = docSnap.data();
+            const coverIcon = data.icon && data.icon.length > 0 ? data.icon[0] : "";
 
             const card = document.createElement("a");
             card.className = "waifu-card";
             card.href = `waifu-detail.html?id=${docSnap.id}`;
 
             card.innerHTML = `
-                <img src="${data.icon || ''}" alt="${data.name}">
+                <img src="${coverIcon}" alt="${data.name}">
                 <div class="waifu-card-info">
                     <h3>${data.name}</h3>
                     <p>${data.source}</p>
