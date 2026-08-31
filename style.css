@@ -1136,3 +1136,18 @@ footer {
         font-size: 16px;
     }
 }
+
+
+/* =========================
+   CURRENTLY PLAYING - COVER 1:1
+========================= */
+
+.currently-playing img {
+    width: 100%;
+    max-width: 280px;
+    aspect-ratio: 1/1;
+    object-fit: cover;
+    border-radius: 14px;
+    display: block;
+    margin: 0 auto;
+}
