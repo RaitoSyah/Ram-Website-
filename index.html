@@ -306,18 +306,22 @@
                 Currently Playing
             </h3>
 
-            <p>
-                Belum ditentukan.
-            </p>
+            <div id="home-currently-playing">
+                <p style="color:var(--text-light); font-size:14px;">
+                    Memuat...
+                </p>
+            </div>
 
 
             <h3>
                 Currently Listening
             </h3>
 
-            <p>
-                Belum ditentukan.
-            </p>
+            <div id="home-currently-listening">
+                <p style="color:var(--text-light); font-size:14px;">
+                    Memuat...
+                </p>
+            </div>
 
 
             <h3>
@@ -379,8 +383,11 @@
         import {
             collection,
             query,
+            where,
             orderBy,
             limit,
+            doc,
+            getDoc,
             getDocs
         } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
@@ -439,6 +446,94 @@
         }
 
         loadLatestJournal();
+
+
+        // ==========================================
+        // CURRENTLY PLAYING (dari game-sessions + games)
+        // ==========================================
+
+        async function loadCurrentlyPlaying() {
+
+            const el = document.getElementById("home-currently-playing");
+
+            try {
+
+                const sessionsQuery = query(
+                    collection(db, "game-sessions"),
+                    orderBy("startedAt", "desc"),
+                    limit(1)
+                );
+
+                const sessionsSnapshot = await getDocs(sessionsQuery);
+
+                if (sessionsSnapshot.empty) {
+                    el.innerHTML = `<p>Belum ditentukan.</p>`;
+                    return;
+                }
+
+                const session = sessionsSnapshot.docs[0].data();
+
+                const gameSnap = await getDoc(doc(db, "games", session.gameRef));
+
+                if (!gameSnap.exists()) {
+                    el.innerHTML = `<p>Belum ditentukan.</p>`;
+                    return;
+                }
+
+                const game = gameSnap.data();
+
+                el.innerHTML = `
+                    <a href="fun/games.html" style="text-decoration:none; color:inherit; display:block;">
+                        <p><strong>${game.name}</strong> — ${game.category}</p>
+                    </a>
+                `;
+
+            } catch (error) {
+                el.innerHTML = `<p style="color:#e53e3e; font-size:14px;">Gagal memuat: ${error.message}</p>`;
+            }
+
+        }
+
+
+        // ==========================================
+        // CURRENTLY LISTENING (dari music)
+        // ==========================================
+
+        async function loadCurrentlyListening() {
+
+            const el = document.getElementById("home-currently-listening");
+
+            try {
+
+                const musicQuery = query(
+                    collection(db, "music"),
+                    where("status", "==", "currently")
+                );
+
+                const snapshot = await getDocs(musicQuery);
+
+                if (snapshot.empty) {
+                    el.innerHTML = `<p>Belum ditentukan.</p>`;
+                    return;
+                }
+
+                const song = snapshot.docs[0].data();
+
+                el.innerHTML = `
+                    <a href="fun/music.html" style="text-decoration:none; color:inherit; display:block;">
+                        <p><strong>${song.title}</strong> — ${song.artist}</p>
+                    </a>
+                `;
+
+            } catch (error) {
+                el.innerHTML = `<p style="color:#e53e3e; font-size:14px;">Gagal memuat: ${error.message}</p>`;
+            }
+
+        }
+
+
+        loadCurrentlyPlaying();
+        loadCurrentlyListening();
 
     </script>
 
