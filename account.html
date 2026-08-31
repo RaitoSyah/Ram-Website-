@@ -486,6 +486,53 @@
 
 
         <!-- ==========================================
+             FORM TAMBAH WAIFU
+        =========================================== -->
+
+        <section id="waifu-panel" class="admin-box">
+
+            <h2>Tambah Waifu</h2>
+
+            <div class="admin-field">
+                <label for="w-waifu-name">Nama Karakter</label>
+                <input type="text" id="w-waifu-name" placeholder="Nama karakter">
+            </div>
+
+            <div class="admin-field">
+                <label for="w-waifu-source">Asal (Game/Anime)</label>
+                <input type="text" id="w-waifu-source" placeholder="Blue Archive, Genshin Impact, dll">
+            </div>
+
+            <div class="admin-field">
+                <label for="w-waifu-photos">Link Foto (satu baris satu link, foto pertama jadi cover)</label>
+                <textarea id="w-waifu-photos" placeholder="https://.../foto1.jpg"></textarea>
+            </div>
+
+            <div class="admin-field">
+                <label for="w-waifu-bio">Bio</label>
+                <textarea id="w-waifu-bio" placeholder="Sedikit tentang karakter ini"></textarea>
+            </div>
+
+            <div class="admin-field">
+                <label for="w-waifu-why">Kenapa Suka</label>
+                <textarea id="w-waifu-why" placeholder="Alasan personal kenapa suka karakter ini"></textarea>
+            </div>
+
+            <div class="admin-field">
+                <label for="w-waifu-quotes">Quotes / Trivia (opsional)</label>
+                <textarea id="w-waifu-quotes" placeholder="Quote favorit atau trivia menarik"></textarea>
+            </div>
+
+            <button class="admin-btn" id="submit-waifu-btn">
+                Submit Waifu
+            </button>
+
+            <p class="admin-status" id="waifu-status"></p>
+
+        </section>
+
+
+        <!-- ==========================================
              VISITOR PANEL (kalau yang login BUKAN admin)
         =========================================== -->
 
@@ -548,6 +595,7 @@
         const sessionPanel = document.getElementById("session-panel");
         const musicPanel = document.getElementById("music-panel");
         const currentMusicPanel = document.getElementById("current-music-panel");
+        const waifuPanel = document.getElementById("waifu-panel");
         const visitorPanel = document.getElementById("visitor-panel");
         const loginStatus = document.getElementById("login-status");
         const writingStatus = document.getElementById("writing-status");
@@ -556,6 +604,7 @@
         const sessionStatus = document.getElementById("session-status");
         const musicStatus = document.getElementById("music-status");
         const currentMusicStatus = document.getElementById("current-music-status");
+        const waifuStatus = document.getElementById("waifu-status");
 
 
         // ---- CEK STATUS LOGIN & TENTUKAN ROLE ----
@@ -569,6 +618,7 @@
             sessionPanel.style.display = "none";
             musicPanel.style.display = "none";
             currentMusicPanel.style.display = "none";
+            waifuPanel.style.display = "none";
             visitorPanel.style.display = "none";
 
             if (!user) {
@@ -583,6 +633,7 @@
                 sessionPanel.style.display = "block";
                 musicPanel.style.display = "block";
                 currentMusicPanel.style.display = "block";
+                waifuPanel.style.display = "block";
                 document.getElementById("admin-avatar").src = user.photoURL || "";
                 document.getElementById("admin-name").textContent = user.displayName || user.email;
                 populateGameDropdown();
@@ -1046,6 +1097,60 @@
             } catch (error) {
                 currentMusicStatus.textContent = "Gagal menyimpan: " + error.message;
                 currentMusicStatus.className = "admin-status error";
+            }
+
+        });
+
+
+        // ---- SUBMIT WAIFU ----
+
+        document.getElementById("submit-waifu-btn").addEventListener("click", async () => {
+
+            const name = document.getElementById("w-waifu-name").value.trim();
+            const source = document.getElementById("w-waifu-source").value.trim();
+            const bio = document.getElementById("w-waifu-bio").value.trim();
+            const whyLike = document.getElementById("w-waifu-why").value.trim();
+            const quotes = document.getElementById("w-waifu-quotes").value.trim();
+
+            const photosRaw = document.getElementById("w-waifu-photos").value.trim();
+            const photos = photosRaw
+                ? photosRaw.split("\n").map(p => p.trim()).filter(p => p)
+                : [];
+
+            if (!name || !source) {
+                waifuStatus.textContent = "Nama dan asal wajib diisi.";
+                waifuStatus.className = "admin-status error";
+                return;
+            }
+
+            waifuStatus.textContent = "Menyimpan...";
+            waifuStatus.className = "admin-status";
+
+            try {
+
+                await addDoc(collection(db, "waifu"), {
+                    name,
+                    source,
+                    photos,
+                    bio,
+                    whyLike,
+                    quotes,
+                    createdAt: serverTimestamp()
+                });
+
+                waifuStatus.textContent = "Berhasil disimpan!";
+                waifuStatus.className = "admin-status success";
+
+                document.getElementById("w-waifu-name").value = "";
+                document.getElementById("w-waifu-source").value = "";
+                document.getElementById("w-waifu-photos").value = "";
+                document.getElementById("w-waifu-bio").value = "";
+                document.getElementById("w-waifu-why").value = "";
+                document.getElementById("w-waifu-quotes").value = "";
+
+            } catch (error) {
+                waifuStatus.textContent = "Gagal menyimpan: " + error.message;
+                waifuStatus.className = "admin-status error";
             }
 
         });

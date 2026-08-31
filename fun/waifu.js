@@ -1,68 +1,55 @@
-const waifuData = [
+// ========================================
+// FETCH WAIFU DARI FIRESTORE
+// ========================================
 
-    {
-        name: "omgari-hare",
-        source: "Blue Archive",
-        image: "../assets/waifu/omagari-hare.png"
-    },
+import { db } from "../firebase-config.js";
 
-    {
-        name: "Sanhua",
-        source: "Wuthering Waves",
-        image: "../assets/waifu/sanhua.jpg"
-    },
+import {
+    collection,
+    getDocs
+} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
-    {
-        name: "Evelyn",
-        source: "Zenless Zone Zero",
-        image: "../assets/waifu/evelyn.jpg"
-    },
 
-    {
-        name: "Character Name 4",
-        source: "Anime / Game / Manhwa",
-        image: "../assets/waifu/placeholder.jpg"
+async function loadWaifu() {
+
+    const gridEl = document.getElementById("waifu-grid");
+
+    if (!gridEl) return;
+
+    try {
+
+        const snapshot = await getDocs(collection(db, "waifu"));
+
+        if (snapshot.empty) {
+            gridEl.innerHTML = `<p class="coming-soon">Belum ada waifu di sini.</p>`;
+            return;
+        }
+
+        snapshot.forEach((docSnap) => {
+
+            const data = docSnap.data();
+            const coverPhoto = data.photos && data.photos.length > 0 ? data.photos[0] : "";
+
+            const card = document.createElement("a");
+            card.className = "waifu-card";
+            card.href = `waifu-detail.html?id=${docSnap.id}`;
+
+            card.innerHTML = `
+                <img src="${coverPhoto}" alt="${data.name}">
+                <div class="waifu-card-info">
+                    <h3>${data.name}</h3>
+                    <p>${data.source}</p>
+                </div>
+            `;
+
+            gridEl.appendChild(card);
+
+        });
+
+    } catch (error) {
+        gridEl.innerHTML = `<p style="color:#e53e3e;">Gagal memuat: ${error.message}</p>`;
     }
 
-];
+}
 
-
-const waifuGallery = document.querySelector(".waifu-gallery");
-
-
-waifuData.forEach(function (waifu) {
-
-    const card = document.createElement("article");
-
-    card.className = "waifu-card";
-
-    card.innerHTML = `
-
-        <div class="waifu-image">
-
-            <img
-                src="${waifu.image}"
-                alt="${waifu.name}"
-            >
-
-        </div>
-
-
-        <div class="waifu-info">
-
-            <h3>
-                ${waifu.name}
-            </h3>
-
-            <p>
-                From: ${waifu.source}
-            </p>
-
-        </div>
-
-    `;
-
-
-    waifuGallery.appendChild(card);
-
-});
+loadWaifu();

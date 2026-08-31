@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Loading... - Ramdhan's Corner</title>
+
+    <link rel="stylesheet" href="../style.css">
+
+    <style>
+
+        .waifu-photos {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 10px;
+            margin: 20px 0 30px;
+        }
+
+        .waifu-photos img {
+            width: 100%;
+            max-height: 380px;
+            object-fit: cover;
+            border-radius: 14px;
+            display: block;
+        }
+
+        .waifu-source-tag {
+            display: inline-block;
+            font-size: 13px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            color: var(--accent);
+            margin-bottom: 8px;
+        }
+
+        .waifu-section {
+            margin-top: 28px;
+        }
+
+        .waifu-section h3 {
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+
+        .waifu-quotes {
+            font-style: italic;
+            padding: 14px 18px;
+            border-left: 3px solid var(--accent);
+            background: var(--surface-soft);
+            border-radius: 8px;
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+    <header>
+
+        <h1>Ramdhan's Corner</h1>
+
+        <nav>
+            <a href="../index.html">Home</a>
+            <a href="index.html">Fun Stuff</a>
+        </nav>
+
+    </header>
+
+
+    <main>
+
+        <article id="waifu-content">
+
+            <p style="color:var(--text-light); font-size:14px;">
+                Memuat...
+            </p>
+
+        </article>
+
+    </main>
+
+
+    <footer>
+        <p>© 2026 Ramdhan</p>
+    </footer>
+
+
+    <script type="module">
+
+        import { db } from "../firebase-config.js";
+
+        import {
+            doc,
+            getDoc
+        } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+
+        const params = new URLSearchParams(window.location.search);
+        const waifuId = params.get("id");
+
+        const contentEl = document.getElementById("waifu-content");
+
+
+        async function loadWaifu() {
+
+            if (!waifuId) {
+                contentEl.innerHTML = `<p>Karakter tidak ditemukan.</p>`;
+                return;
+            }
+
+            try {
+
+                const snap = await getDoc(doc(db, "waifu", waifuId));
+
+                if (!snap.exists()) {
+                    contentEl.innerHTML = `<p>Karakter tidak ditemukan.</p>`;
+                    return;
+                }
+
+                const data = snap.data();
+
+                document.title = `${data.name} - Ramdhan's Corner`;
+
+                let photosHtml = "";
+                if (data.photos && data.photos.length > 0) {
+                    photosHtml = `<div class="waifu-photos">`;
+                    data.photos.forEach(url => {
+                        photosHtml += `<img src="${url}" alt="${data.name}">`;
+                    });
+                    photosHtml += `</div>`;
+                }
+
+                let bioHtml = "";
+                if (data.bio) {
+                    bioHtml = `
+                        <div class="waifu-section">
+                            <h3>Bio</h3>
+                            <p>${data.bio}</p>
+                        </div>
+                    `;
+                }
+
+                let whyLikeHtml = "";
+                if (data.whyLike) {
+                    whyLikeHtml = `
+                        <div class="waifu-section">
+                            <h3>Kenapa Aku Suka</h3>
+                            <p>${data.whyLike}</p>
+                        </div>
+                    `;
+                }
+
+                let quotesHtml = "";
+                if (data.quotes) {
+                    quotesHtml = `
+                        <div class="waifu-section">
+                            <h3>Quotes / Trivia</h3>
+                            <p class="waifu-quotes">${data.quotes}</p>
+                        </div>
+                    `;
+                }
+
+                contentEl.innerHTML = `
+                    <p class="waifu-source-tag">${data.source}</p>
+                    <h2>${data.name}</h2>
+                    ${photosHtml}
+                    ${bioHtml}
+                    ${whyLikeHtml}
+                    ${quotesHtml}
+                    <p style="margin-top:30px;">
+                        <a class="back-link" href="index.html">← Back to Fun Stuff</a>
+                    </p>
+                `;
+
+            } catch (error) {
+                contentEl.innerHTML = `<p style="color:#e53e3e;">Gagal memuat: ${error.message}</p>`;
+            }
+
+        }
+
+        loadWaifu();
+
+    </script>
+
+</body>
+
+</html>

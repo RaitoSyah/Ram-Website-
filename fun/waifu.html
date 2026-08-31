@@ -10,37 +10,75 @@
         content="width=device-width, initial-scale=1.0"
     >
 
-    <title>My Waifu Collection - Ramdhan</title>
+    <title>Waifu - Ramdhan's Corner</title>
 
     <link rel="stylesheet" href="../style.css">
+
+    <style>
+
+        .waifu-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 14px;
+        }
+
+        .waifu-card {
+            display: block;
+            text-decoration: none;
+            color: var(--text);
+            border-radius: 14px;
+            overflow: hidden;
+            background: var(--surface-soft);
+            border: 1px solid var(--border);
+            transition: 0.2s;
+        }
+
+        .waifu-card:hover {
+            border-color: var(--accent);
+            transform: translateY(-3px);
+        }
+
+        .waifu-card img {
+            width: 100%;
+            aspect-ratio: 3/4;
+            object-fit: cover;
+            display: block;
+        }
+
+        .waifu-card-info {
+            padding: 10px 12px;
+        }
+
+        .waifu-card-info h3 {
+            font-size: 14px;
+            margin: 0 0 2px;
+        }
+
+        .waifu-card-info p {
+            font-size: 12px;
+            color: var(--text-light);
+            margin: 0;
+        }
+
+        .coming-soon {
+            color: var(--text-light);
+            font-size: 14px;
+        }
+
+    </style>
 
 </head>
 
 
 <body>
 
-    <!-- =========================
-         HEADER
-    ========================= -->
-
     <header>
 
-        <h1>Ramdhan</h1>
+        <h1>Ramdhan's Corner</h1>
 
         <nav>
-
             <a href="../index.html">Home</a>
-
-            <a href="../about.html">About</a>
-
-            <a href="../writings/index.html">Writings</a>
-
-            <a href="../journal/index.html">Journal</a>
-
             <a href="index.html">Fun Stuff</a>
-
-            <a href="../index.html#private">Private Room</a>
-
         </nav>
 
     </header>
@@ -48,115 +86,46 @@
 
     <main>
 
-
-        <!-- =========================
-             INTRO
-        ========================= -->
-
         <section class="hero">
 
-            <p class="greeting">
-                A COMPLETELY SERIOUS COLLECTION
-            </p>
+            <p class="greeting">MY WAIFU</p>
 
-            <h2>
-                My Waifu Collection 💗
-            </h2>
+            <h2>A Personal Collection. 💙</h2>
 
             <p class="hero-text">
-                Fictional characters that somehow managed
-                to occupy way too much space in my head.
+                Karakter-karakter yang aku suka, dari berbagai game dan anime,
+                lengkap dengan cerita kenapa aku suka mereka.
             </p>
 
         </section>
 
-
-        <!-- =========================
-             COLLECTION
-        ========================= -->
 
         <section>
 
-            <p class="writing-category">
-                MY COLLECTION
-            </p>
+            <p class="writing-category">COLLECTION</p>
 
-            <h2>
-                Characters I Like
-            </h2>
+            <h2>The List</h2>
 
-            <p>
-                A collection of characters from anime,
-                games, manhwa, and other fictional worlds.
-            </p>
-
-
-            <!-- =========================
-                 WAIFU GALLERY
-            ========================= -->
-
-<div class="waifu-gallery">
-
-</div>
+            <div id="waifu-grid" class="waifu-grid">
+                <p class="coming-soon">Memuat...</p>
+            </div>
 
         </section>
 
-
-        <!-- =========================
-             NOTE
-        ========================= -->
-
-        <section>
-
-            <p class="writing-category">
-                A LITTLE NOTE
-            </p>
-
-            <h2>
-                More Characters Coming.
-            </h2>
-
-            <p>
-                This collection isn't supposed to be
-                complete. There are probably more fictional
-                characters waiting to invade this page.
-            </p>
-
-        </section>
-
-
-        <!-- =========================
-             BACK
-        ========================= -->
 
         <p>
-
-            <a
-                class="back-link"
-                href="index.html"
-            >
-                ← Back to Fun Stuff
-            </a>
-
+            <a class="back-link" href="index.html">← Back to Fun Stuff</a>
         </p>
-
 
     </main>
 
 
-    <!-- =========================
-         FOOTER
-    ========================= -->
-
     <footer>
-
-        <p>
-            © 2026 Ramdhan
-        </p>
-
+        <p>© 2026 Ramdhan</p>
     </footer>
 
-  <script src="waifu.js"></script>
+
+    <script type="module" src="waifu.js"></script>
 
 </body>
 
