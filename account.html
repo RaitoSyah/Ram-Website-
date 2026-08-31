@@ -504,8 +504,13 @@
             </div>
 
             <div class="admin-field">
-                <label for="w-waifu-photos">Link Foto (satu baris satu link, foto pertama jadi cover)</label>
-                <textarea id="w-waifu-photos" placeholder="https://.../foto1.jpg"></textarea>
+                <label for="w-waifu-icon">Link Icon (rasio 1:1, buat tampil di grid)</label>
+                <input type="text" id="w-waifu-icon" placeholder="https://.../icon.jpg">
+            </div>
+
+            <div class="admin-field">
+                <label for="w-waifu-photos">Link Potret (satu baris satu link, full body, buat halaman detail)</label>
+                <textarea id="w-waifu-photos" placeholder="https://.../potret1.jpg"></textarea>
             </div>
 
             <div class="admin-field">
@@ -1108,6 +1113,7 @@
 
             const name = document.getElementById("w-waifu-name").value.trim();
             const source = document.getElementById("w-waifu-source").value.trim();
+            const icon = document.getElementById("w-waifu-icon").value.trim();
             const bio = document.getElementById("w-waifu-bio").value.trim();
             const whyLike = document.getElementById("w-waifu-why").value.trim();
             const quotes = document.getElementById("w-waifu-quotes").value.trim();
@@ -1131,6 +1137,7 @@
                 await addDoc(collection(db, "waifu"), {
                     name,
                     source,
+                    icon,
                     photos,
                     bio,
                     whyLike,
@@ -1143,6 +1150,7 @@
 
                 document.getElementById("w-waifu-name").value = "";
                 document.getElementById("w-waifu-source").value = "";
+                document.getElementById("w-waifu-icon").value = "";
                 document.getElementById("w-waifu-photos").value = "";
                 document.getElementById("w-waifu-bio").value = "";
                 document.getElementById("w-waifu-why").value = "";
