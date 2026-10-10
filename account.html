@@ -289,8 +289,8 @@
                 <label>Isi Tulisan</label>
                 <div id="w-toolbar">
                     <span class="ql-formats">
-                        <select id="ed-font" class="ed-select" title="Font"></select>
-                        <select id="ed-size" class="ed-select" title="Ukuran huruf"></select>
+                        <select id="ed-font" class="ql-font" title="Font"></select>
+                        <select id="ed-size" class="ql-size" title="Ukuran huruf"></select>
                     </span>
                     <span class="ql-formats">
                         <select class="ql-header">
@@ -852,9 +852,9 @@
             const fontSel = document.getElementById("ed-font");
             const sizeSel = document.getElementById("ed-size");
 
-            fontSel.innerHTML = '<option value="">Font</option>' +
+            fontSel.innerHTML = '<option value="" selected>Font</option>' +
                 fontNames.map(n => `<option value="${n}">${n}</option>`).join("");
-            sizeSel.innerHTML = '<option value="">Ukuran</option>' +
+            sizeSel.innerHTML = '<option value="" selected>Ukuran</option>' +
                 FONT_SIZES.map(z => `<option value="${z}">${parseInt(z, 10)}</option>`).join("");
 
             quill = new Quill("#w-editor", {
@@ -870,35 +870,20 @@
             document.getElementById("ed-undo").addEventListener("click", () => quill.history.undo());
             document.getElementById("ed-redo").addEventListener("click", () => quill.history.redo());
 
-            // Kontrol di luar Quill (select/warna kustom) mengambil fokus, jadi
-            // posisi seleksi terakhir disimpan lalu dipulihkan sebelum memberi format.
+            // Font dan ukuran ditangani langsung oleh toolbar Quill (kelas ql-font dan ql-size).
+            // Warna kustom memakai kotak warna bawaan browser yang mengambil fokus,
+            // jadi posisi seleksi terakhir disimpan lalu dipulihkan sebelum memberi format.
             let lastRange = null;
 
-            function setSelectValue(sel, val) {
-                sel.value = [...sel.options].some(o => o.value === val) ? val : "";
-            }
-
-            function syncToolbar() {
-                const f = quill.getFormat();
-                setSelectValue(fontSel, f.font || "");
-                setSelectValue(sizeSel, f.size || "");
-            }
-
             quill.on("selection-change", (range) => {
-                if (range) {
-                    lastRange = range;
-                    syncToolbar();
-                }
+                if (range) lastRange = range;
             });
 
             function applyFormat(name, value) {
                 if (lastRange) quill.setSelection(lastRange.index, lastRange.length);
                 quill.format(name, value || false);
-                syncToolbar();
             }
 
-            fontSel.addEventListener("change", () => applyFormat("font", fontSel.value));
-            sizeSel.addEventListener("change", () => applyFormat("size", sizeSel.value));
             document.getElementById("ed-color").addEventListener("change", (e) => applyFormat("color", e.target.value));
             document.getElementById("ed-bg").addEventListener("change", (e) => applyFormat("background", e.target.value));
         }
