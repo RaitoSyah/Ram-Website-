@@ -193,6 +193,18 @@
         #w-toolbar select.ed-select { width:auto; max-width:120px; padding:2px 4px; font-size:13px; border:1px solid var(--border); border-radius:6px; background:transparent; color:var(--text); }
         #w-toolbar input[type=color] { width:26px; height:24px; padding:0; border:1px solid var(--border); border-radius:6px; background:transparent; cursor:pointer; vertical-align:middle; }
         #w-toolbar .ed-tiny { font-size:11px; opacity:.7; margin-right:2px; }
+        #w-toolbar #ed-colorpanel { width:auto; padding:0 8px; font-size:13px; }
+        #color-panel { display:none; padding:12px; border:1px solid var(--border); border-top:none; background:var(--surface-soft); font-size:14px; }
+        #color-panel .cp-row { display:flex; align-items:center; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
+        #color-panel .cp-label { width:34px; font-weight:600; }
+        #color-panel label { display:flex; align-items:center; gap:6px; margin:0; font-weight:400; }
+        #color-panel input[type=radio] { width:auto; margin:0; }
+        #color-panel input[type=text] { padding:8px; border:1px solid var(--border); border-radius:6px; background:transparent; color:var(--text); font-size:16px; font-family:inherit; }
+        #color-panel .cp-hex { width:150px; }
+        #color-panel .cp-rgb { width:56px; text-align:center; }
+        #cp-preview { width:36px; height:36px; border:1px solid var(--border); border-radius:6px; background:transparent; }
+        #cp-msg { margin:0 0 8px; font-size:13px; color:#e53e3e; min-height:0; }
+        #color-panel button { padding:6px 12px; border:1px solid var(--border); border-radius:8px; background:transparent; color:inherit; cursor:pointer; font-family:inherit; }
         .ql-tooltip input[type=text] { width:170px; padding:3px 5px; border-radius:0; }
     </style>
 
@@ -324,14 +336,35 @@
                         <select class="ql-background" title="Highlight"></select>
                     </span>
                     <span class="ql-formats">
-                        <span class="ed-tiny">Kustom</span>
-                        <input type="color" id="ed-color" value="#000000" title="Warna teks kustom">
-                        <input type="color" id="ed-bg" value="#ffff00" title="Highlight kustom">
+                        <button type="button" id="ed-colorpanel" title="Warna kustom (hex / RGB)">Kustom</button>
                     </span>
                     <span class="ql-formats">
                         <button type="button" id="ed-undo" title="Undo">↶</button>
                         <button type="button" id="ed-redo" title="Redo">↷</button>
                     </span>
+                </div>
+                <div id="color-panel">
+                    <div class="cp-row">
+                        <label><input type="radio" name="cp-target" value="color" checked> Warna teks</label>
+                        <label><input type="radio" name="cp-target" value="background"> Highlight</label>
+                    </div>
+                    <div class="cp-row">
+                        <span class="cp-label">Hex</span>
+                        <input type="text" id="cp-hex" class="cp-hex" placeholder="#FF5733" maxlength="22" autocomplete="off" autocapitalize="off">
+                    </div>
+                    <div class="cp-row">
+                        <span class="cp-label">RGB</span>
+                        <input type="text" id="cp-r" class="cp-rgb" placeholder="R" inputmode="numeric" maxlength="3" autocomplete="off">
+                        <input type="text" id="cp-g" class="cp-rgb" placeholder="G" inputmode="numeric" maxlength="3" autocomplete="off">
+                        <input type="text" id="cp-b" class="cp-rgb" placeholder="B" inputmode="numeric" maxlength="3" autocomplete="off">
+                        <div id="cp-preview" title="Pratinjau warna"></div>
+                    </div>
+                    <p id="cp-msg"></p>
+                    <div class="cp-row">
+                        <button type="button" id="cp-apply">Terapkan</button>
+                        <button type="button" id="cp-remove">Hapus warna</button>
+                        <button type="button" id="cp-close">Tutup</button>
+                    </div>
                 </div>
                 <div id="w-editor"></div>
             </div>
@@ -891,8 +924,89 @@
                 quill.format(name, value || false);
             }
 
-            document.getElementById("ed-color").addEventListener("change", (e) => applyFormat("color", e.target.value));
-            document.getElementById("ed-bg").addEventListener("change", (e) => applyFormat("background", e.target.value));
+            // ---- Warna kustom: hex atau RGB ----
+            const panel = document.getElementById("color-panel");
+            const hexIn = document.getElementById("cp-hex");
+            const rIn = document.getElementById("cp-r");
+            const gIn = document.getElementById("cp-g");
+            const bIn = document.getElementById("cp-b");
+            const preview = document.getElementById("cp-preview");
+            const msg = document.getElementById("cp-msg");
+
+            // Menerima: #FF5733, ff5733, #f53, 255,87,51, atau rgb(255, 87, 51)
+            function parseColor(raw) {
+                const t = String(raw || "").trim();
+                let m = t.match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i);
+                if (m) {
+                    let h = m[1];
+                    if (h.length === 3) h = h.split("").map(c => c + c).join("");
+                    return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+                }
+                m = t.match(/^(?:rgb\(\s*)?(\d{1,3})\s*[,\s]\s*(\d{1,3})\s*[,\s]\s*(\d{1,3})\s*\)?$/i);
+                if (m) {
+                    const v = [Number(m[1]), Number(m[2]), Number(m[3])];
+                    if (v.every(n => n >= 0 && n <= 255)) return v;
+                }
+                return null;
+            }
+
+            const toHex = (rgb) => "#" + rgb.map(n => n.toString(16).padStart(2, "0")).join("").toUpperCase();
+
+            function showPreview(rgb) {
+                preview.style.background = rgb ? toHex(rgb) : "transparent";
+            }
+
+            hexIn.addEventListener("input", () => {
+                msg.textContent = "";
+                const rgb = parseColor(hexIn.value);
+                if (rgb) {
+                    rIn.value = rgb[0];
+                    gIn.value = rgb[1];
+                    bIn.value = rgb[2];
+                }
+                showPreview(rgb);
+            });
+
+            [rIn, gIn, bIn].forEach(inp => inp.addEventListener("input", () => {
+                msg.textContent = "";
+                inp.value = inp.value.replace(/\D/g, "");
+                const v = [rIn.value, gIn.value, bIn.value];
+                if (v.every(x => x !== "" && Number(x) >= 0 && Number(x) <= 255)) {
+                    const rgb = v.map(Number);
+                    hexIn.value = toHex(rgb);
+                    showPreview(rgb);
+                } else {
+                    showPreview(null);
+                }
+            }));
+
+            document.getElementById("ed-colorpanel").addEventListener("click", () => {
+                panel.style.display = panel.style.display === "block" ? "none" : "block";
+            });
+
+            document.getElementById("cp-close").addEventListener("click", () => {
+                panel.style.display = "none";
+            });
+
+            function targetFormat() {
+                return document.querySelector('input[name="cp-target"]:checked').value;
+            }
+
+            document.getElementById("cp-apply").addEventListener("click", () => {
+                const rgb = parseColor(hexIn.value)
+                    || parseColor([rIn.value, gIn.value, bIn.value].join(","));
+                if (!rgb) {
+                    msg.textContent = "Kode warna tidak valid. Contoh hex: #FF5733. Contoh RGB: 255, 87, 51.";
+                    return;
+                }
+                msg.textContent = "";
+                applyFormat(targetFormat(), toHex(rgb).toLowerCase());
+            });
+
+            document.getElementById("cp-remove").addEventListener("click", () => {
+                msg.textContent = "";
+                applyFormat(targetFormat(), false);
+            });
         }
 
         initEditor();
