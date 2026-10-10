@@ -240,7 +240,9 @@
             </div>
 
             <div class="admin-field">
-                <label>Kelola Tulisan (ketuk Edit untuk mengubah)</label>
+                <label>Kelola Tulisan</label>
+                <input type="search" id="writing-search" placeholder="Cari tulisan untuk diedit (judul, tags, isi)..." autocomplete="off">
+                <p id="writing-list-info" style="font-size:13px; opacity:.7; margin:8px 0 0;"></p>
                 <div id="writing-list"><p style="font-size:14px; opacity:.7;">Memuat...</p></div>
             </div>
 
@@ -842,52 +844,101 @@
             writingStatus.textContent = "";
         }
 
+        const SEARCH_LIMIT = 10;
+
+        function lastTouchedMs(data) {
+            const u = data.updatedAt && data.updatedAt.toMillis ? data.updatedAt.toMillis() : 0;
+            const c = data.createdAt && data.createdAt.toMillis ? data.createdAt.toMillis() : 0;
+            return Math.max(u, c);
+        }
+
+        function renderWritingList() {
+            const listEl = document.getElementById("writing-list");
+            const infoEl = document.getElementById("writing-list-info");
+            const term = document.getElementById("writing-search").value.trim().toLowerCase();
+
+            const all = [...writingMap.entries()]
+                .map(([id, data]) => ({ id, data, t: lastTouchedMs(data) }))
+                .sort((x, y) => y.t - x.t);
+
+            let shownItems;
+
+            if (!term) {
+                // Tanpa pencarian: hanya 1 tulisan yang terakhir dibuat/diedit
+                shownItems = all.slice(0, 1);
+                infoEl.textContent = all.length > 1
+                    ? `Terakhir dibuat/diedit. Ada ${all.length - 1} tulisan lain, cari untuk menemukannya.`
+                    : "";
+            } else {
+                const found = all.filter(({ data }) => {
+                    const tags = Array.isArray(data.tags) && data.tags.length
+                        ? data.tags
+                        : (data.category ? [data.category] : []);
+                    return String(data.title || "").toLowerCase().includes(term)
+                        || tags.some(t => String(t).toLowerCase().includes(term))
+                        || String(data.description || "").toLowerCase().includes(term)
+                        || String(data.content || "").toLowerCase().includes(term);
+                });
+                shownItems = found.slice(0, SEARCH_LIMIT);
+                infoEl.textContent = found.length > SEARCH_LIMIT
+                    ? `${found.length} hasil, menampilkan ${SEARCH_LIMIT} pertama. Persempit kata kuncinya.`
+                    : `${found.length} hasil`;
+            }
+
+            listEl.innerHTML = "";
+
+            if (!shownItems.length) {
+                listEl.innerHTML = term
+                    ? '<p style="font-size:14px; opacity:.7;">Tidak ada tulisan yang cocok.</p>'
+                    : '<p style="font-size:14px; opacity:.7;">Belum ada tulisan.</p>';
+                return;
+            }
+
+            shownItems.forEach(({ id, data }) => {
+                const date = data.createdAt && data.createdAt.toDate
+                    ? data.createdAt.toDate().toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })
+                    : "";
+                const edited = data.updatedAt && data.updatedAt.toDate
+                    ? " · diedit " + data.updatedAt.toDate().toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })
+                    : "";
+
+                const item = document.createElement("div");
+                item.className = "writing-list-item";
+
+                const info = document.createElement("div");
+                const t = document.createElement("p");
+                t.className = "wl-title";
+                t.textContent = data.title || "(tanpa judul)";
+                const m = document.createElement("p");
+                m.className = "wl-meta";
+                m.textContent = date + edited;
+                info.appendChild(t);
+                info.appendChild(m);
+
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.textContent = "Edit";
+                btn.addEventListener("click", () => startEdit(id));
+
+                item.appendChild(info);
+                item.appendChild(btn);
+                listEl.appendChild(item);
+            });
+        }
+
         async function loadWritingList() {
             const listEl = document.getElementById("writing-list");
             try {
                 const snap = await getDocs(query(collection(db, "writings"), orderBy("createdAt", "desc")));
                 writingMap.clear();
-                listEl.innerHTML = "";
-
-                if (snap.empty) {
-                    listEl.innerHTML = '<p style="font-size:14px; opacity:.7;">Belum ada tulisan.</p>';
-                    return;
-                }
-
-                snap.forEach(d => {
-                    const data = d.data();
-                    writingMap.set(d.id, data);
-
-                    const date = data.createdAt && data.createdAt.toDate
-                        ? data.createdAt.toDate().toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })
-                        : "";
-
-                    const item = document.createElement("div");
-                    item.className = "writing-list-item";
-
-                    const info = document.createElement("div");
-                    const t = document.createElement("p");
-                    t.className = "wl-title";
-                    t.textContent = data.title || "(tanpa judul)";
-                    const m = document.createElement("p");
-                    m.className = "wl-meta";
-                    m.textContent = date;
-                    info.appendChild(t);
-                    info.appendChild(m);
-
-                    const btn = document.createElement("button");
-                    btn.type = "button";
-                    btn.textContent = "Edit";
-                    btn.addEventListener("click", () => startEdit(d.id));
-
-                    item.appendChild(info);
-                    item.appendChild(btn);
-                    listEl.appendChild(item);
-                });
+                snap.forEach(d => writingMap.set(d.id, d.data()));
+                renderWritingList();
             } catch (e) {
                 listEl.innerHTML = '<p style="font-size:14px; color:#e53e3e;">Gagal memuat daftar: ' + String(e.message).replace(/[<>&]/g, "") + '</p>';
             }
         }
+
+        document.getElementById("writing-search").addEventListener("input", renderWritingList);
 
         document.getElementById("cancel-edit-btn").addEventListener("click", cancelEdit);
 
@@ -998,6 +1049,7 @@
                 document.getElementById("w-title").value = "";
                 document.getElementById("w-tags").value = "";
                 exitEditMode();
+                document.getElementById("writing-search").value = "";
                 loadWritingList();
                 loadTagSuggestions();
                 document.getElementById("w-desc").value = "";
