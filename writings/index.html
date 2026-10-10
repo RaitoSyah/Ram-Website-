@@ -23,6 +23,16 @@
 
     <link rel="stylesheet" href="../style.css">
 
+    <style>
+        .search-row { display:flex; gap:8px; margin-top:4px; }
+        .search-row input { flex:1; min-width:0; padding:10px 12px; font-size:16px; border:1px solid var(--border, #ccc); border-radius:8px; background:transparent; color:inherit; font-family:inherit; }
+        .search-row button { padding:10px 14px; border:1px solid var(--border, #ccc); border-radius:8px; background:transparent; color:inherit; cursor:pointer; font-family:inherit; }
+        .tag-row { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+        .tag-pill { padding:4px 12px; border:1px solid var(--accent); border-radius:999px; font-size:13px; color:var(--accent); background:transparent; cursor:pointer; text-transform:capitalize; font-family:inherit; }
+        .card-meta { font-size:13px; color:var(--text-light); margin:0 0 8px; }
+        .result-info { font-size:14px; color:var(--text-light); margin:12px 0; }
+    </style>
+
 </head>
 
 
@@ -66,139 +76,40 @@
         </section>
 
 
-        <!-- FIVE DIMENSIONS -->
+        <!-- SEARCH -->
 
         <section>
-
-            <h2>Five Dimensions</h2>
-
-
-            <!-- PSYCHOLOGY -->
-
-            <article class="dimension-card">
-
-                <p class="writing-category">
-                    01 · PSYCHOLOGY
-                </p>
-
-                <h3>Psychology</h3>
-
-                <p>
-                    Human behavior, emotions,
-                    relationships, attachment,
-                    and the strange things our minds do.
-                </p>
-
-                <a href="psychology.html">
-                    Explore →
-                </a>
-
-            </article>
-
-
-            <!-- TECHNOLOGY & COMPUTER SCIENCE -->
-
-            <article class="dimension-card">
-
-                <p class="writing-category">
-                    02 · TECHNOLOGY & COMPUTER SCIENCE
-                </p>
-
-                <h3>Technology & Computer Science</h3>
-
-                <p>
-                    Tech, programming, gadgets, experiments,
-                    and the things I build or break along the way.
-                </p>
-
-                <a href="technology.html">
-                    Explore →
-                </a>
-
-            </article>
-
-
-            <!-- SOCIETY -->
-
-            <article class="dimension-card">
-
-                <p class="writing-category">
-                    03 · SOCIETY
-                </p>
-
-                <h3>Society</h3>
-
-                <p>
-                    People, culture, social behavior,
-                    and things happening around us.
-                </p>
-
-                <a href="society.html">
-                    Explore →
-                </a>
-
-            </article>
-
-
-            <!-- CURIOSITY -->
-
-            <article class="dimension-card">
-
-                <p class="writing-category">
-                    04 · CURIOSITY
-                </p>
-
-                <h3>Curiosity</h3>
-
-                <p>
-                    Questions that randomly appear
-                    in my head and refuse to leave.
-                </p>
-
-                <a href="curiosity.html">
-                    Explore →
-                </a>
-
-            </article>
-
-
-            <!-- PERSONAL -->
-
-            <article class="dimension-card">
-
-                <p class="writing-category">
-                    05 · PERSONAL
-                </p>
-
-                <h3>Personal</h3>
-
-                <p>
-                    Experiences, memories,
-                    reflections, and little pieces
-                    of my everyday life.
-                </p>
-
-                <a href="personal.html">
-                    Explore →
-                </a>
-
-            </article>
-
+            <div class="search-row">
+                <input type="search" id="search-input" placeholder="Cari judul, tags, atau isi tulisan..." autocomplete="off">
+                <button type="button" id="search-clear" style="display:none;">✕</button>
+            </div>
+            <div id="active-filter" class="result-info" style="display:none;"></div>
         </section>
 
 
         <!-- LATEST WRITING -->
 
-        <section>
-
+        <section id="latest-section">
             <h2>Latest Writing</h2>
-
             <div id="latest-writing">
-                <p style="color:var(--text-light); font-size:14px;">
-                    Memuat tulisan terbaru...
-                </p>
+                <p style="color:var(--text-light); font-size:14px;">Memuat tulisan terbaru...</p>
             </div>
+        </section>
 
+
+        <!-- ALL WRITINGS -->
+
+        <section>
+            <h2 id="all-title">All Writings</h2>
+            <div id="all-writings"></div>
+        </section>
+
+
+        <!-- POPULAR TAGS -->
+
+        <section id="tags-section" style="display:none;">
+            <h2>Popular Tags</h2>
+            <div class="tag-row" id="popular-tags"></div>
         </section>
 
 
@@ -235,63 +146,193 @@
             collection,
             query,
             orderBy,
-            limit,
             getDocs
         } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 
         const latestEl = document.getElementById("latest-writing");
+        const latestSection = document.getElementById("latest-section");
+        const allEl = document.getElementById("all-writings");
+        const allTitle = document.getElementById("all-title");
+        const searchInput = document.getElementById("search-input");
+        const clearBtn = document.getElementById("search-clear");
+        const filterInfo = document.getElementById("active-filter");
+        const tagsSection = document.getElementById("tags-section");
+        const popularTagsEl = document.getElementById("popular-tags");
+
+        let writings = [];
+        let activeTag = "";
 
 
-        async function loadLatest() {
+        const esc = (t) => String(t ?? "").replace(/[&<>"']/g, c => ({
+            "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+        }[c]));
 
-            try {
 
-                const q = query(
-                    collection(db, "writings"),
-                    orderBy("createdAt", "desc"),
-                    limit(1)
-                );
+        // Artikel lama belum punya tags: pakai kategori lamanya sebagai tag sementara
+        function tagsOf(data) {
+            if (Array.isArray(data.tags) && data.tags.length) return data.tags;
+            return data.category ? [String(data.category).toLowerCase()] : [];
+        }
 
-                const snapshot = await getDocs(q);
+        function readMinutes(content) {
+            const words = (content || "").trim().split(/\s+/).filter(Boolean).length;
+            return Math.max(1, Math.ceil(words / 250));
+        }
 
-                if (snapshot.empty) {
-                    latestEl.innerHTML = `
-                        <article class="writing-card">
-                            <h3>Belum Ada Tulisan</h3>
-                            <p>Tulisan pertamaku akan muncul di sini.</p>
-                        </article>
-                    `;
-                    return;
-                }
+        function formatDate(ts) {
+            return ts && ts.toDate
+                ? ts.toDate().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+                : "";
+        }
 
-                const doc = snapshot.docs[0];
-                const data = doc.data();
+        function cardHtml(w) {
+            const dateText = formatDate(w.createdAt);
+            const meta = (dateText ? dateText + " · " : "") + w.minutes + " min read";
+            const tagsHtml = w.tags.length
+                ? `<div class="tag-row" style="margin:0 0 12px;">${w.tags.map(t => `<button type="button" class="tag-pill" data-tag="${esc(t)}">${esc(t)}</button>`).join("")}</div>`
+                : "";
+            return `
+                <article class="writing-card">
+                    <h3>${esc(w.title)}</h3>
+                    <p class="card-meta">${esc(meta)}</p>
+                    <p>${esc(w.description)}</p>
+                    ${tagsHtml}
+                    <a href="article.html?id=${encodeURIComponent(w.id)}">Read this →</a>
+                </article>
+            `;
+        }
 
-                const categoryLabel = data.category
-                    ? data.category.toUpperCase()
-                    : "";
 
-                latestEl.innerHTML = `
+        function render() {
+
+            const term = searchInput.value.trim().toLowerCase();
+            const filtering = term !== "" || activeTag !== "";
+
+            clearBtn.style.display = filtering ? "block" : "none";
+            latestSection.style.display = filtering ? "none" : "block";
+
+            if (activeTag) {
+                filterInfo.style.display = "block";
+                filterInfo.textContent = "Tag: " + activeTag;
+            } else {
+                filterInfo.style.display = "none";
+            }
+
+            const results = writings.filter(w => {
+                if (activeTag && !w.tags.includes(activeTag)) return false;
+                if (!term) return true;
+                return w.title.toLowerCase().includes(term)
+                    || w.tags.some(t => t.includes(term))
+                    || w.description.toLowerCase().includes(term)
+                    || w.content.toLowerCase().includes(term);
+            });
+
+            allTitle.textContent = filtering
+                ? `Hasil (${results.length})`
+                : "All Writings";
+
+            if (!results.length) {
+                allEl.innerHTML = `
                     <article class="writing-card">
-                        <p class="writing-category">${categoryLabel}</p>
-                        <h3>${data.title}</h3>
-                        <p>${data.description}</p>
-                        <a href="article.html?id=${doc.id}">Read this →</a>
+                        <h3>Tidak ada hasil</h3>
+                        <p>Coba kata kunci lain, atau hapus pencarian untuk melihat semua tulisan.</p>
                     </article>
                 `;
+                return;
+            }
+
+            allEl.innerHTML = results.map(cardHtml).join("");
+        }
+
+
+        function renderLatest() {
+            if (!writings.length) {
+                latestEl.innerHTML = `
+                    <article class="writing-card">
+                        <h3>Belum Ada Tulisan</h3>
+                        <p>Tulisan pertamaku akan muncul di sini.</p>
+                    </article>
+                `;
+                return;
+            }
+            latestEl.innerHTML = cardHtml(writings[0]);
+        }
+
+
+        function renderPopularTags() {
+            const count = {};
+            writings.forEach(w => w.tags.forEach(t => { count[t] = (count[t] || 0) + 1; }));
+            const top = Object.entries(count)
+                .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+                .slice(0, 12);
+            if (!top.length) return;
+            tagsSection.style.display = "block";
+            popularTagsEl.innerHTML = top
+                .map(([t, n]) => `<button type="button" class="tag-pill" data-tag="${esc(t)}">${esc(t)} (${n})</button>`)
+                .join("");
+        }
+
+
+        function setTag(tag) {
+            activeTag = tag;
+            searchInput.value = "";
+            const url = new URL(location.href);
+            if (tag) url.searchParams.set("tag", tag); else url.searchParams.delete("tag");
+            history.replaceState(null, "", url);
+            render();
+            window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+
+
+        // Klik tag di mana pun (kartu atau Popular Tags)
+        document.addEventListener("click", (e) => {
+            const btn = e.target.closest("[data-tag]");
+            if (btn) setTag(btn.dataset.tag);
+        });
+
+        searchInput.addEventListener("input", render);
+
+        clearBtn.addEventListener("click", () => {
+            searchInput.value = "";
+            setTag("");
+        });
+
+
+        async function load() {
+            try {
+                const q = query(collection(db, "writings"), orderBy("createdAt", "desc"));
+                const snapshot = await getDocs(q);
+
+                writings = snapshot.docs.map(d => {
+                    const data = d.data();
+                    return {
+                        id: d.id,
+                        title: data.title || "",
+                        description: data.description || "",
+                        content: data.content || "",
+                        createdAt: data.createdAt,
+                        tags: tagsOf(data).map(t => String(t).toLowerCase()),
+                        minutes: readMinutes(data.content)
+                    };
+                });
+
+                activeTag = (new URL(location.href).searchParams.get("tag") || "").toLowerCase();
+
+                renderLatest();
+                renderPopularTags();
+                render();
 
             } catch (error) {
                 latestEl.innerHTML = `
                     <p style="color:#e53e3e; font-size:14px;">
-                        Gagal memuat: ${error.message}
+                        Gagal memuat: ${esc(error.message)}
                     </p>
                 `;
             }
-
         }
 
-        loadLatest();
+        load();
 
     </script>
 
