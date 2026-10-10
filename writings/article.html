@@ -260,6 +260,14 @@
         .article-tags { display:flex; flex-wrap:wrap; gap:8px; margin-bottom: 24px; }
         .article-tags a { padding:4px 12px; border:1px solid var(--accent); border-radius:999px; font-size:13px; text-decoration:none; color:var(--accent); text-transform:capitalize; }
 
+        .full-article,
+        .full-article p,
+        .full-article .rich-content {
+            max-width: 100%;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+
         .full-article .rich-content h2 { font-size: 24px; font-weight: 700; line-height: 1.3; margin: 32px 0 12px; }
         .full-article .rich-content h3 { font-size: 20px; font-weight: 700; line-height: 1.3; margin: 28px 0 10px; }
         .full-article .rich-content h4 { font-size: 17px; font-weight: 700; line-height: 1.3; margin: 24px 0 8px; }
@@ -444,6 +452,8 @@
                             ALLOWED_ATTR: ["href", "target", "rel", "class"]
                         });
                     }
+                    // Spasi khusus (&nbsp;) dari editor dijadikan spasi biasa supaya teks bisa turun baris
+                    clean = clean.replace(/&nbsp;|\u00a0/g, " ");
                     paragraphs = `<div class="rich-content">${clean}</div>`;
                 } else {
                     // Tulisan lama (teks biasa): pisah per baris jadi paragraf

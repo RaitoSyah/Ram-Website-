@@ -1102,7 +1102,7 @@
             const description = document.getElementById("w-desc").value.trim();
             const contentText = quill ? quill.getText().trim() : "";
             const content = (quill && contentText)
-                ? DOMPurify.sanitize(quill.getSemanticHTML(), PURIFY)
+                ? DOMPurify.sanitize(quill.getSemanticHTML(), PURIFY).replace(/&nbsp;|\u00a0/g, " ")
                 : "";
 
             const photosRaw = document.getElementById("w-photos").value.trim();
