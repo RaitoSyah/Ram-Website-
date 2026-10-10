@@ -283,6 +283,8 @@
         .related-section { margin-top: 48px; }
         .related-section h3 { font-size: 20px; margin: 0 0 16px; }
         .related-meta { font-size: 13px; color: var(--text-light); margin: 0 0 8px; }
+
+        .draft-banner { padding: 10px 14px; border: 1px dashed var(--accent); border-radius: 8px; font-size: 13px; margin: 0 0 20px; }
     </style>
 
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.4/dist/purify.min.js"></script>
@@ -384,6 +386,7 @@
 
         const params = new URLSearchParams(window.location.search);
         const articleId = params.get("id");
+        const isDraft = params.get("draft") === "1"; // pratinjau draft (hanya admin yang bisa membacanya)
 
         const contentEl = document.getElementById("article-content");
 
@@ -487,7 +490,7 @@
 
             try {
 
-                const snap = await getDoc(doc(db, "writings", articleId));
+                const snap = await getDoc(doc(db, isDraft ? "drafts" : "writings", articleId));
 
                 if (!snap.exists()) {
                     contentEl.innerHTML = `<p>Tulisan tidak ditemukan.</p>`;
@@ -570,8 +573,9 @@
                     : "";
 
                 const metaParts = [];
-                if (dateText) metaParts.push("Published " + dateText);
-                if (updatedText && updatedText !== dateText) metaParts.push("Updated " + updatedText);
+                if (isDraft) metaParts.push("Draft");
+                else if (dateText) metaParts.push("Published " + dateText);
+                if (!isDraft && updatedText && updatedText !== dateText) metaParts.push("Updated " + updatedText);
                 metaParts.push(minutes + " min read");
 
                 const metaHtml = `<p class="article-meta">${metaParts.join(" · ")}</p>`;
@@ -588,6 +592,7 @@
                 const backLabel = "All Writings";
 
                 contentEl.innerHTML = `
+                    ${isDraft ? '<p class="draft-banner">DRAFT · Pratinjau, belum terbit. Hanya kamu yang bisa melihat ini.</p>' : ""}
                     <p class="writing-category">${categoryLabel}</p>
                     <h2>${esc(data.title)}</h2>
                     ${metaHtml}
@@ -600,10 +605,14 @@
                     </p>
                 `;
 
-                loadRelated(snap.id, data);
+                if (!isDraft) loadRelated(snap.id, data);
 
             } catch (error) {
-                contentEl.innerHTML = `<p style="color:#e53e3e;">Gagal memuat tulisan: ${error.message}</p>`;
+                if (error && error.code === "permission-denied") {
+                    contentEl.innerHTML = `<p>Tulisan tidak ditemukan.</p>`;
+                } else {
+                    contentEl.innerHTML = `<p style="color:#e53e3e;">Gagal memuat tulisan: ${error.message}</p>`;
+                }
             }
 
         }

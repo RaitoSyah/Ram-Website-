@@ -261,6 +261,7 @@
                 <label>Kelola Tulisan</label>
                 <input type="search" id="writing-search" placeholder="Cari tulisan untuk diedit (judul, tags, isi)..." autocomplete="off">
                 <p id="writing-list-info" style="font-size:13px; opacity:.7; margin:8px 0 0;"></p>
+                <button type="button" id="drafts-toggle" style="display:none; margin:8px 0; padding:6px 12px; border:1px solid var(--border, #ccc); border-radius:8px; background:transparent; color:inherit; cursor:pointer; font-family:inherit;"></button>
                 <div id="writing-list"><p style="font-size:14px; opacity:.7;">Memuat...</p></div>
             </div>
 
@@ -366,9 +367,14 @@
                 </button>
             </div>
 
-            <button class="admin-btn" id="submit-writing-btn" style="margin-top:20px;">
-                Submit Writing
-            </button>
+            <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:20px;">
+                <button type="button" class="admin-btn" id="save-draft-btn" style="margin-top:0; flex:1 1 140px; background:transparent; border:1px solid var(--border, #ccc); color:inherit;">
+                    Simpan Draft
+                </button>
+                <button class="admin-btn" id="submit-writing-btn" style="margin-top:0; flex:1 1 140px;">
+                    Publish
+                </button>
+            </div>
 
             <p class="admin-status" id="writing-status"></p>
 
@@ -676,6 +682,7 @@
             orderBy,
             doc,
             updateDoc,
+            deleteDoc,
             serverTimestamp
         } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
@@ -913,6 +920,24 @@
         // ---- EDIT TULISAN ----
 
         let editingId = null;
+        let editingSource = null;      // "writings" (sudah terbit), "drafts", atau null (tulisan baru)
+        const sourceMap = new Map();   // id -> "writings" | "drafts"
+        let draftsOnly = false;
+
+        function updateButtons() {
+            const pubBtn = document.getElementById("submit-writing-btn");
+            const draftBtn = document.getElementById("save-draft-btn");
+            if (editingSource === "writings") {
+                // Tulisan yang sudah terbit tidak dikembalikan jadi draft
+                draftBtn.style.display = "none";
+                pubBtn.textContent = "Simpan Perubahan";
+            } else {
+                draftBtn.style.display = "";
+                draftBtn.textContent = "Simpan Draft";
+                pubBtn.textContent = "Publish";
+            }
+        }
+
         const writingMap = new Map();
 
         const REF_OPTIONS = ["instagram", "youtube", "tiktok", "threads", "x", "journal", "article", "other"];
@@ -945,9 +970,10 @@
 
         function exitEditMode() {
             editingId = null;
+            editingSource = null;
             document.getElementById("edit-banner").style.display = "none";
             document.getElementById("writing-heading").textContent = "Tambah Writing";
-            document.getElementById("submit-writing-btn").textContent = "Submit Writing";
+            updateButtons();
         }
 
         function startEdit(id) {
@@ -955,6 +981,7 @@
             if (!data) return;
 
             editingId = id;
+            editingSource = sourceMap.get(id) || "writings";
 
             document.getElementById("w-title").value = data.title || "";
             document.getElementById("w-desc").value = data.description || "";
@@ -972,10 +999,10 @@
             const refs = Array.isArray(data.references) && data.references.length ? data.references : [null];
             refs.forEach(r => container.appendChild(makeRefRow(r)));
 
-            document.getElementById("edit-title").textContent = data.title || "(tanpa judul)";
+            document.getElementById("edit-title").textContent = (data.title || "(tanpa judul)") + (editingSource === "drafts" ? " (draft)" : "");
             document.getElementById("edit-banner").style.display = "block";
-            document.getElementById("writing-heading").textContent = "Edit Writing";
-            document.getElementById("submit-writing-btn").textContent = "Simpan Perubahan";
+            document.getElementById("writing-heading").textContent = editingSource === "drafts" ? "Edit Draft" : "Edit Writing";
+            updateButtons();
             writingStatus.textContent = "";
 
             document.getElementById("edit-banner").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1013,7 +1040,15 @@
 
             let shownItems;
 
-            if (!term) {
+            const draftItems = all.filter(x => sourceMap.get(x.id) === "drafts");
+            const toggle = document.getElementById("drafts-toggle");
+            toggle.style.display = draftItems.length ? "inline-block" : "none";
+            toggle.textContent = draftsOnly ? "← Kembali" : `Lihat draft (${draftItems.length})`;
+
+            if (!term && draftsOnly) {
+                shownItems = draftItems.slice(0, SEARCH_LIMIT);
+                infoEl.textContent = `${draftItems.length} draft (belum terbit)`;
+            } else if (!term) {
                 // Tanpa pencarian: hanya 1 tulisan yang terakhir dibuat/diedit
                 shownItems = all.slice(0, 1);
                 infoEl.textContent = all.length > 1
@@ -1045,6 +1080,7 @@
             }
 
             shownItems.forEach(({ id, data }) => {
+                const isDraft = sourceMap.get(id) === "drafts";
                 const date = data.createdAt && data.createdAt.toDate
                     ? data.createdAt.toDate().toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })
                     : "";
@@ -1058,10 +1094,10 @@
                 const info = document.createElement("div");
                 const t = document.createElement("p");
                 t.className = "wl-title";
-                t.textContent = data.title || "(tanpa judul)";
+                t.textContent = (isDraft ? "[Draft] " : "") + (data.title || "(tanpa judul)");
                 const m = document.createElement("p");
                 m.className = "wl-meta";
-                m.textContent = date + edited;
+                m.textContent = date + edited + (isDraft ? " · belum terbit" : "");
                 info.appendChild(t);
                 info.appendChild(m);
 
@@ -1070,8 +1106,24 @@
                 btn.textContent = "Edit";
                 btn.addEventListener("click", () => startEdit(id));
 
+                const group = document.createElement("div");
+                group.style.display = "flex";
+                group.style.gap = "6px";
+
+                if (isDraft) {
+                    const prev = document.createElement("button");
+                    prev.type = "button";
+                    prev.textContent = "Pratinjau";
+                    prev.addEventListener("click", () => {
+                        window.open("writings/article.html?id=" + encodeURIComponent(id) + "&draft=1", "_blank");
+                    });
+                    group.appendChild(prev);
+                }
+
+                group.appendChild(btn);
+
                 item.appendChild(info);
-                item.appendChild(btn);
+                item.appendChild(group);
                 listEl.appendChild(item);
             });
         }
@@ -1081,14 +1133,31 @@
             try {
                 const snap = await getDocs(query(collection(db, "writings"), orderBy("createdAt", "desc")));
                 writingMap.clear();
-                snap.forEach(d => writingMap.set(d.id, d.data()));
+                sourceMap.clear();
+                snap.forEach(d => { writingMap.set(d.id, d.data()); sourceMap.set(d.id, "writings"); });
+
+                // Draft (kalau aturan Firestore untuk drafts belum dipasang, daftar terbit tetap tampil)
+                let draftNote = "";
+                try {
+                    const dsnap = await getDocs(collection(db, "drafts"));
+                    dsnap.forEach(d => { writingMap.set(d.id, d.data()); sourceMap.set(d.id, "drafts"); });
+                } catch (e) {
+                    draftNote = "Draft belum bisa dimuat: pasang aturan Firestore untuk koleksi drafts.";
+                }
+
                 renderWritingList();
+                if (draftNote) document.getElementById("writing-list-info").textContent = draftNote;
             } catch (e) {
                 listEl.innerHTML = '<p style="font-size:14px; color:#e53e3e;">Gagal memuat daftar: ' + String(e.message).replace(/[<>&]/g, "") + '</p>';
             }
         }
 
         document.getElementById("writing-search").addEventListener("input", renderWritingList);
+
+        document.getElementById("drafts-toggle").addEventListener("click", () => {
+            draftsOnly = !draftsOnly;
+            renderWritingList();
+        });
 
         document.getElementById("cancel-edit-btn").addEventListener("click", cancelEdit);
 
@@ -1136,7 +1205,7 @@
 
         // ---- SUBMIT WRITING (admin only, tapi rules Firestore yang jamin keamanannya) ----
 
-        document.getElementById("submit-writing-btn").addEventListener("click", async () => {
+        async function saveWriting(mode) {
 
             const tags = parseTags(document.getElementById("w-tags").value);
             const title = document.getElementById("w-title").value.trim();
@@ -1168,8 +1237,14 @@
                 return;
             }
 
-            if (!title || !description || !content) {
-                writingStatus.textContent = "Judul, deskripsi, dan isi tulisan wajib diisi.";
+            if (mode === "draft" && !title) {
+                writingStatus.textContent = "Judul wajib diisi, walaupun untuk draft.";
+                writingStatus.className = "admin-status error";
+                return;
+            }
+
+            if (mode === "publish" && (!title || !description || !content)) {
+                writingStatus.textContent = "Judul, deskripsi, dan isi tulisan wajib diisi sebelum diterbitkan.";
                 writingStatus.className = "admin-status error";
                 return;
             }
@@ -1179,38 +1254,48 @@
 
             try {
 
-                if (editingId) {
-                    // Edit: createdAt (tanggal publikasi) tidak disentuh, hanya updatedAt yang baru
-                    await updateDoc(doc(db, "writings", editingId), {
-                        tags,
-                        title,
-                        description,
-                        content,
-                        contentText,
-                        contentFormat: "html",
-                        photos,
-                        references,
-                        updatedAt: serverTimestamp()
-                    });
+                const fields = {
+                    tags,
+                    title,
+                    description,
+                    content,
+                    contentText,
+                    contentFormat: "html",
+                    photos,
+                    references
+                };
+
+                let message;
+
+                if (editingId && editingSource === "writings") {
+                    // Sudah terbit: createdAt (tanggal terbit) tidak disentuh, hanya updatedAt
+                    await updateDoc(doc(db, "writings", editingId), { ...fields, updatedAt: serverTimestamp() });
+                    message = "Perubahan disimpan!";
+
+                } else if (mode === "draft") {
+                    // Draft disimpan di koleksi "drafts" (tidak tampil di website)
+                    if (editingId) {
+                        await updateDoc(doc(db, "drafts", editingId), { ...fields, updatedAt: serverTimestamp() });
+                    } else {
+                        await addDoc(collection(db, "drafts"), { ...fields, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+                    }
+                    message = "Draft disimpan. Belum tampil di website.";
+
                 } else {
-                    await addDoc(collection(db, "writings"), {
-                        tags,
-                        title,
-                        description,
-                        content,
-                        contentText,
-                        contentFormat: "html",
-                        photos,
-                        references,
-                        createdAt: serverTimestamp()
-                    });
+                    // Publish: tanggal terbit = sekarang. Kalau berasal dari draft, draft-nya dihapus.
+                    await addDoc(collection(db, "writings"), { ...fields, createdAt: serverTimestamp() });
+                    if (editingId && editingSource === "drafts") {
+                        await deleteDoc(doc(db, "drafts", editingId));
+                    }
+                    message = "Berhasil diterbitkan!";
                 }
 
-                writingStatus.textContent = editingId ? "Perubahan disimpan!" : "Berhasil disimpan!";
+                writingStatus.textContent = message;
                 writingStatus.className = "admin-status success";
 
                 document.getElementById("w-title").value = "";
                 document.getElementById("w-tags").value = "";
+                draftsOnly = false;
                 exitEditMode();
                 document.getElementById("writing-search").value = "";
                 loadWritingList();
@@ -1241,7 +1326,10 @@
                 writingStatus.className = "admin-status error";
             }
 
-        });
+        }
+
+        document.getElementById("submit-writing-btn").addEventListener("click", () => saveWriting("publish"));
+        document.getElementById("save-draft-btn").addEventListener("click", () => saveWriting("draft"));
 
 
         // ---- SUBMIT JOURNAL ----
