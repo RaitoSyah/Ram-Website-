@@ -331,7 +331,7 @@
                 const d = snapshot.docs[0];
                 const data = d.data();
 
-                const words = (data.content || "").trim().split(/\s+/).filter(Boolean).length;
+                const words = (data.contentText ?? data.content ?? "").trim().split(/\s+/).filter(Boolean).length;
                 const minutes = Math.max(1, Math.ceil(words / 250));
                 const dateText = data.createdAt
                     ? data.createdAt.toDate().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })

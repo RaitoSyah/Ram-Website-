@@ -179,8 +179,23 @@
         .writing-list-item button { flex-shrink:0; padding:6px 12px; border:1px solid var(--border, #ccc); border-radius:8px; background:transparent; color:inherit; cursor:pointer; font-family:inherit; }
         #edit-banner { display:none; padding:10px 12px; border:1px solid var(--accent, #888); border-radius:8px; margin-bottom:16px; font-size:14px; }
         #edit-banner button { margin-left:8px; padding:4px 10px; border:1px solid var(--border, #ccc); border-radius:8px; background:transparent; color:inherit; cursor:pointer; font-family:inherit; }
+
+        /* ---- RICH TEXT EDITOR ---- */
+        #w-toolbar.ql-toolbar { border:1px solid var(--border); border-radius:10px 10px 0 0; background:var(--surface-soft); position:sticky; top:0; z-index:5; }
+        #w-editor.ql-container { border:1px solid var(--border); border-top:none; border-radius:0 0 10px 10px; background:var(--surface-soft); color:var(--text); font-family:inherit; font-size:16px; }
+        #w-editor .ql-editor { min-height:260px; line-height:1.7; }
+        #w-editor .ql-editor.ql-blank::before { color:var(--text-light); font-style:normal; }
+        #w-toolbar .ql-stroke { stroke:var(--text); }
+        #w-toolbar .ql-fill { fill:var(--text); }
+        #w-toolbar .ql-picker, #w-toolbar button { color:var(--text); }
+        #w-toolbar #ed-undo, #w-toolbar #ed-redo { width:auto; padding:0 8px; font-size:18px; }
+        #w-editor .ql-editor blockquote { border-left:4px solid var(--accent); padding-left:12px; margin:12px 0; }
+        .ql-tooltip input[type=text] { width:170px; padding:3px 5px; border-radius:0; }
     </style>
 
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css">
+    <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.4/dist/purify.min.js"></script>
 </head>
 
 
@@ -268,8 +283,40 @@
             </div>
 
             <div class="admin-field">
-                <label for="w-content">Isi Tulisan</label>
-                <textarea id="w-content" placeholder="Isi lengkap tulisan" style="min-height:180px;"></textarea>
+                <label>Isi Tulisan</label>
+                <div id="w-toolbar">
+                    <span class="ql-formats">
+                        <select class="ql-header">
+                            <option value="2">Heading 2</option>
+                            <option value="3">Heading 3</option>
+                            <option value="4">Heading 4</option>
+                            <option selected>Paragraf</option>
+                        </select>
+                    </span>
+                    <span class="ql-formats">
+                        <button class="ql-bold" title="Bold"></button>
+                        <button class="ql-italic" title="Italic"></button>
+                        <button class="ql-underline" title="Underline"></button>
+                        <button class="ql-strike" title="Coret"></button>
+                    </span>
+                    <span class="ql-formats">
+                        <select class="ql-align" title="Rata teks"></select>
+                    </span>
+                    <span class="ql-formats">
+                        <button class="ql-list" value="ordered" title="Daftar bernomor"></button>
+                        <button class="ql-list" value="bullet" title="Daftar bullet"></button>
+                        <button class="ql-blockquote" title="Kutipan"></button>
+                    </span>
+                    <span class="ql-formats">
+                        <button class="ql-link" title="Tautan"></button>
+                        <button class="ql-clean" title="Hapus format"></button>
+                    </span>
+                    <span class="ql-formats">
+                        <button type="button" id="ed-undo" title="Undo">↶</button>
+                        <button type="button" id="ed-redo" title="Redo">↷</button>
+                    </span>
+                </div>
+                <div id="w-editor"></div>
             </div>
 
             <div class="admin-field">
@@ -760,6 +807,68 @@
         });
 
 
+        // ---- RICH TEXT EDITOR (Quill) + PENYARINGAN (DOMPurify) ----
+
+        const PURIFY = {
+            ALLOWED_TAGS: ["p", "br", "strong", "em", "u", "s", "h2", "h3", "h4", "ul", "ol", "li", "blockquote", "a"],
+            ALLOWED_ATTR: ["href", "target", "rel", "class"]
+        };
+
+        const libsReady = typeof Quill !== "undefined" && typeof DOMPurify !== "undefined";
+
+        if (libsReady) {
+            DOMPurify.addHook("afterSanitizeAttributes", (node) => {
+                if (node.hasAttribute && node.hasAttribute("class")) {
+                    const keep = node.getAttribute("class").split(/\s+/).filter(c => /^ql-align-(center|right|justify)$/.test(c));
+                    if (keep.length) node.setAttribute("class", keep.join(" "));
+                    else node.removeAttribute("class");
+                }
+                if (node.tagName === "A") {
+                    node.setAttribute("target", "_blank");
+                    node.setAttribute("rel", "noopener noreferrer");
+                }
+            });
+        }
+
+        let quill = null;
+
+        if (libsReady) {
+            quill = new Quill("#w-editor", {
+                theme: "snow",
+                placeholder: "Mulai menulis...",
+                formats: ["header", "bold", "italic", "underline", "strike", "align", "list", "blockquote", "link"],
+                modules: {
+                    toolbar: "#w-toolbar",
+                    history: { userOnly: true }
+                }
+            });
+            document.getElementById("ed-undo").addEventListener("click", () => quill.history.undo());
+            document.getElementById("ed-redo").addEventListener("click", () => quill.history.redo());
+        } else {
+            document.getElementById("w-editor").innerHTML =
+                '<p style="padding:12px; color:#e53e3e;">Editor gagal dimuat. Periksa koneksi internet lalu muat ulang halaman.</p>';
+        }
+
+        function setEditorContent(data) {
+            if (!quill) return;
+            if (data.contentFormat === "html") {
+                quill.setText("");
+                quill.clipboard.dangerouslyPasteHTML(DOMPurify.sanitize(data.content || "", PURIFY));
+            } else {
+                // Tulisan lama (teks biasa): tiap baris jadi satu paragraf
+                const text = String(data.content || "").split("\n").filter(l => l.trim()).join("\n");
+                quill.setText(text);
+            }
+            quill.history.clear();
+        }
+
+        function clearEditor() {
+            if (!quill) return;
+            quill.setText("");
+            quill.history.clear();
+        }
+
+
         // ---- EDIT TULISAN ----
 
         let editingId = null;
@@ -808,7 +917,7 @@
 
             document.getElementById("w-title").value = data.title || "";
             document.getElementById("w-desc").value = data.description || "";
-            document.getElementById("w-content").value = data.content || "";
+            setEditorContent(data);
             document.getElementById("w-photos").value = (data.photos || []).join("\n");
 
             // Tulisan lama belum punya tags: isi dengan kategori lamanya sebagai usulan
@@ -835,7 +944,7 @@
             exitEditMode();
             document.getElementById("w-title").value = "";
             document.getElementById("w-desc").value = "";
-            document.getElementById("w-content").value = "";
+            clearEditor();
             document.getElementById("w-photos").value = "";
             document.getElementById("w-tags").value = "";
             const container = document.getElementById("reference-inputs");
@@ -877,7 +986,7 @@
                     return String(data.title || "").toLowerCase().includes(term)
                         || tags.some(t => String(t).toLowerCase().includes(term))
                         || String(data.description || "").toLowerCase().includes(term)
-                        || String(data.content || "").toLowerCase().includes(term);
+                        || String(data.contentText ?? data.content ?? "").toLowerCase().includes(term);
                 });
                 shownItems = found.slice(0, SEARCH_LIMIT);
                 infoEl.textContent = found.length > SEARCH_LIMIT
@@ -991,7 +1100,10 @@
             const tags = parseTags(document.getElementById("w-tags").value);
             const title = document.getElementById("w-title").value.trim();
             const description = document.getElementById("w-desc").value.trim();
-            const content = document.getElementById("w-content").value.trim();
+            const contentText = quill ? quill.getText().trim() : "";
+            const content = (quill && contentText)
+                ? DOMPurify.sanitize(quill.getSemanticHTML(), PURIFY)
+                : "";
 
             const photosRaw = document.getElementById("w-photos").value.trim();
             const photos = photosRaw
@@ -1008,6 +1120,12 @@
                     references.push({ type, title: refTitle, url });
                 }
             });
+
+            if (!quill) {
+                writingStatus.textContent = "Editor belum termuat. Periksa koneksi lalu muat ulang halaman.";
+                writingStatus.className = "admin-status error";
+                return;
+            }
 
             if (!title || !description || !content) {
                 writingStatus.textContent = "Judul, deskripsi, dan isi tulisan wajib diisi.";
@@ -1027,6 +1145,8 @@
                         title,
                         description,
                         content,
+                        contentText,
+                        contentFormat: "html",
                         photos,
                         references,
                         updatedAt: serverTimestamp()
@@ -1037,6 +1157,8 @@
                         title,
                         description,
                         content,
+                        contentText,
+                        contentFormat: "html",
                         photos,
                         references,
                         createdAt: serverTimestamp()
@@ -1053,7 +1175,7 @@
                 loadWritingList();
                 loadTagSuggestions();
                 document.getElementById("w-desc").value = "";
-                document.getElementById("w-content").value = "";
+                clearEditor();
                 document.getElementById("w-photos").value = "";
                 document.getElementById("reference-inputs").innerHTML = `
                     <div class="reference-input-row">

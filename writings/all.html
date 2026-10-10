@@ -145,14 +145,15 @@
 
         function toItem(d) {
             const data = d.data();
+            const text = data.contentText ?? data.content ?? "";
             return {
                 id: d.id,
                 title: data.title || "",
                 description: data.description || "",
-                content: data.content || "",
+                content: text,
                 createdAt: data.createdAt,
                 tags: tagsOf(data).map(t => String(t).toLowerCase()),
-                minutes: readMinutes(data.content)
+                minutes: readMinutes(text)
             };
         }
 

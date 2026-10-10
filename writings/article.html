@@ -259,8 +259,21 @@
         .article-meta { font-size: 14px; color: var(--text-light); margin: -12px 0 20px; }
         .article-tags { display:flex; flex-wrap:wrap; gap:8px; margin-bottom: 24px; }
         .article-tags a { padding:4px 12px; border:1px solid var(--accent); border-radius:999px; font-size:13px; text-decoration:none; color:var(--accent); text-transform:capitalize; }
+
+        .full-article .rich-content h2 { font-size: 24px; font-weight: 700; line-height: 1.3; margin: 32px 0 12px; }
+        .full-article .rich-content h3 { font-size: 20px; font-weight: 700; line-height: 1.3; margin: 28px 0 10px; }
+        .full-article .rich-content h4 { font-size: 17px; font-weight: 700; line-height: 1.3; margin: 24px 0 8px; }
+        .full-article .rich-content ul,
+        .full-article .rich-content ol { margin: 0 0 16px 24px; line-height: 1.75; font-size: 16px; }
+        .full-article .rich-content li { margin-bottom: 6px; }
+        .full-article .rich-content blockquote { border-left: 4px solid var(--accent); margin: 20px 0; padding: 4px 0 4px 16px; font-style: italic; color: var(--text-light); }
+        .full-article .rich-content a { color: var(--accent); text-decoration: underline; word-break: break-word; }
+        .full-article .rich-content .ql-align-center { text-align: center; }
+        .full-article .rich-content .ql-align-right { text-align: right; }
+        .full-article .rich-content .ql-align-justify { text-align: justify; }
     </style>
 
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.4/dist/purify.min.js"></script>
 </head>
 
 
@@ -406,12 +419,40 @@
                     photosHtml += `</div>`;
                 }
 
-                // Isi tulisan (pisah per baris jadi paragraf)
-                const paragraphs = data.content
-                    .split("\n")
-                    .filter(p => p.trim())
-                    .map(p => `<p>${p}</p>`)
-                    .join("");
+                // Isi tulisan
+                let paragraphs;
+
+                if (data.contentFormat === "html") {
+                    // Tulisan dari editor baru: HTML disaring dulu sebelum ditampilkan
+                    let clean;
+                    if (typeof DOMPurify === "undefined") {
+                        clean = "<p>Isi tulisan tidak dapat ditampilkan. Muat ulang halaman.</p>";
+                    } else {
+                        DOMPurify.addHook("afterSanitizeAttributes", (node) => {
+                            if (node.hasAttribute && node.hasAttribute("class")) {
+                                const keep = node.getAttribute("class").split(/\s+/).filter(c => /^ql-align-(center|right|justify)$/.test(c));
+                                if (keep.length) node.setAttribute("class", keep.join(" "));
+                                else node.removeAttribute("class");
+                            }
+                            if (node.tagName === "A") {
+                                node.setAttribute("target", "_blank");
+                                node.setAttribute("rel", "noopener noreferrer");
+                            }
+                        });
+                        clean = DOMPurify.sanitize(data.content || "", {
+                            ALLOWED_TAGS: ["p", "br", "strong", "em", "u", "s", "h2", "h3", "h4", "ul", "ol", "li", "blockquote", "a"],
+                            ALLOWED_ATTR: ["href", "target", "rel", "class"]
+                        });
+                    }
+                    paragraphs = `<div class="rich-content">${clean}</div>`;
+                } else {
+                    // Tulisan lama (teks biasa): pisah per baris jadi paragraf
+                    paragraphs = (data.content || "")
+                        .split("\n")
+                        .filter(p => p.trim())
+                        .map(p => `<p>${p}</p>`)
+                        .join("");
+                }
 
                 // Referensi
                 let referencesHtml = "";
@@ -444,7 +485,7 @@
                     : "";
 
                 // Perkiraan waktu baca: kata / 250, dibulatkan ke atas
-                const words = (data.content || "").trim().split(/\s+/).filter(Boolean).length;
+                const words = (data.contentText ?? data.content ?? "").trim().split(/\s+/).filter(Boolean).length;
                 const minutes = Math.max(1, Math.ceil(words / 250));
 
                 const updatedText = data.updatedAt && data.updatedAt.toDate
@@ -471,7 +512,7 @@
 
                 contentEl.innerHTML = `
                     <p class="writing-category">${categoryLabel}</p>
-                    <h2>${data.title}</h2>
+                    <h2>${esc(data.title)}</h2>
                     ${metaHtml}
                     ${tagsHtml}
                     ${photosHtml}
