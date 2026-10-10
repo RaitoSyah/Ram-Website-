@@ -457,8 +457,8 @@
 
                 // Label & tombol kembali: pakai kategori lama kalau ada, kalau tidak ke daftar tulisan
                 const categoryLabel = data.category ? data.category.toUpperCase() : "WRITING";
-                const backHref = data.category ? `${data.category}.html` : "index.html";
-                const backLabel = data.category ? categoryLabel : "Writings";
+                const backHref = "all.html";
+                const backLabel = "All Writings";
 
                 contentEl.innerHTML = `
                     <p class="writing-category">${categoryLabel}</p>

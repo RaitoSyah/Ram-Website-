@@ -166,130 +166,18 @@
             </p>
 
 
-            <div class="writing-dimensions">
-
-
-                <!-- PSYCHOLOGY -->
-
-                <article class="dimension-card">
-
-                    <p class="writing-category">
-                        01 · PSYCHOLOGY
-                    </p>
-
-                    <h3>
-                        Psychology
-                    </h3>
-
-                    <p>
-                        Thoughts about human behavior, emotions,
-                        relationships, attachment, and the weird
-                        things our minds do.
-                    </p>
-
-                    <a href="writings/psychology.html">
-                        Explore →
-                    </a>
-
-                </article>
-
-
-                <!-- THOUGHTS -->
-
-                <article class="dimension-card">
-
-                    <p class="writing-category">
-                        02 · TECHNOLOGY
-                    </p>
-
-                    <h3>
-                        TECHNOLOGY
-                    </h3>
-
-                    <p>
-                        Tech, programming, gadgets, experiments, and the things I build or break along the way.
-                    </p>
-
-                    <a href="writings/technology.html">
-                        Explore →
-                    </a>
-
-                </article>
-
-
-                <!-- SOCIETY -->
-
-                <article class="dimension-card">
-
-                    <p class="writing-category">
-                        03 · SOCIETY
-                    </p>
-
-                    <h3>
-                        Society
-                    </h3>
-
-                    <p>
-                        Observations about people, culture,
-                        social behavior, and the world around us.
-                    </p>
-
-                    <a href="writings/society.html">
-                        Explore →
-                    </a>
-
-                </article>
-
-
-                <!-- CURIOSITY -->
-
-                <article class="dimension-card">
-
-                    <p class="writing-category">
-                        04 · CURIOSITY
-                    </p>
-
-                    <h3>
-                        Curiosity
-                    </h3>
-
-                    <p>
-                        Questions that randomly appear in my head
-                        and refuse to leave until I find an answer.
-                    </p>
-
-                    <a href="writings/curiosity.html">
-                        Explore →
-                    </a>
-
-                </article>
-
-
-                <!-- PERSONAL -->
-
-                <article class="dimension-card">
-
-                    <p class="writing-category">
-                        05 · PERSONAL
-                    </p>
-
-                    <h3>
-                        Personal
-                    </h3>
-
-                    <p>
-                        Experiences, memories, reflections,
-                        and little pieces of my everyday life.
-                    </p>
-
-                    <a href="writings/personal.html">
-                        Explore →
-                    </a>
-
-                </article>
-
-
+            <div id="latest-writing">
+                <p style="color:var(--text-light); font-size:14px;">
+                    Memuat tulisan terbaru...
+                </p>
             </div>
+
+            <article class="writing-card">
+                <p class="writing-category">ARCHIVE</p>
+                <h3>All Writings</h3>
+                <p>Semua tulisanku, lengkap dengan pencarian dan tags.</p>
+                <a href="writings/all.html">Lihat semua →</a>
+            </article>
 
         </section>
 
@@ -408,6 +296,68 @@
 
 
         const latestJournalEl = document.getElementById("latest-journal");
+        const latestWritingEl = document.getElementById("latest-writing");
+
+
+        function escHtml(t) {
+            return String(t ?? "").replace(/[&<>"']/g, c => ({
+                "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+            }[c]));
+        }
+
+
+        async function loadLatestWriting() {
+
+            try {
+
+                const q = query(
+                    collection(db, "writings"),
+                    orderBy("createdAt", "desc"),
+                    limit(1)
+                );
+
+                const snapshot = await getDocs(q);
+
+                if (snapshot.empty) {
+                    latestWritingEl.innerHTML = `
+                        <article class="writing-card">
+                            <h3>Belum Ada Tulisan</h3>
+                            <p>Tulisan pertamaku akan muncul di sini.</p>
+                        </article>
+                    `;
+                    return;
+                }
+
+                const d = snapshot.docs[0];
+                const data = d.data();
+
+                const words = (data.content || "").trim().split(/\s+/).filter(Boolean).length;
+                const minutes = Math.max(1, Math.ceil(words / 250));
+                const dateText = data.createdAt
+                    ? data.createdAt.toDate().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+                    : "";
+                const meta = (dateText ? dateText + " · " : "") + minutes + " min read";
+
+                latestWritingEl.innerHTML = `
+                    <article class="writing-card">
+                        <p class="writing-category">LATEST WRITING</p>
+                        <h3>${escHtml(data.title)}</h3>
+                        <p style="font-size:13px; color:var(--text-light);">${escHtml(meta)}</p>
+                        <p>${escHtml(data.description)}</p>
+                        <a href="writings/article.html?id=${encodeURIComponent(d.id)}">Read this →</a>
+                    </article>
+                `;
+
+            } catch (error) {
+                latestWritingEl.innerHTML = `
+                    <p style="color:#e53e3e; font-size:14px;">
+                        Gagal memuat: ${escHtml(error.message)}
+                    </p>
+                `;
+            }
+
+        }
+
 
 
         function formatDate(timestamp) {
@@ -461,6 +411,7 @@
         }
 
         loadLatestJournal();
+        loadLatestWriting();
 
 
         // ==========================================
