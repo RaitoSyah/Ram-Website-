@@ -26,6 +26,8 @@
     <style>
         .search-row { display:flex; gap:8px; margin-top:4px; }
         .search-row input { flex:1; min-width:0; padding:10px 12px; font-size:16px; border:1px solid var(--border, #ccc); border-radius:8px; background:transparent; color:inherit; font-family:inherit; }
+        .search-row input::-webkit-search-cancel-button,
+        .search-row input::-webkit-search-decoration { -webkit-appearance:none; appearance:none; display:none; }
         .search-row button { padding:10px 14px; border:1px solid var(--border, #ccc); border-radius:8px; background:transparent; color:inherit; cursor:pointer; font-family:inherit; }
         .tag-row { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
         .tag-pill { padding:4px 12px; border:1px solid var(--accent); border-radius:999px; font-size:13px; color:var(--accent); background:transparent; cursor:pointer; text-transform:capitalize; font-family:inherit; }
