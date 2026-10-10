@@ -346,6 +346,7 @@
     <script type="module">
 
         import { db, auth } from "../firebase-config.js";
+        import { sanitizeRich, loadCustomFonts } from "../rich-content.js";
 
         import {
             doc,
@@ -431,30 +432,12 @@
                 let paragraphs;
 
                 if (data.contentFormat === "html") {
-                    // Tulisan dari editor baru: HTML disaring dulu sebelum ditampilkan
-                    let clean;
-                    if (typeof DOMPurify === "undefined") {
-                        clean = "<p>Isi tulisan tidak dapat ditampilkan. Muat ulang halaman.</p>";
-                    } else {
-                        DOMPurify.addHook("afterSanitizeAttributes", (node) => {
-                            if (node.hasAttribute && node.hasAttribute("class")) {
-                                const keep = node.getAttribute("class").split(/\s+/).filter(c => /^ql-align-(center|right|justify)$/.test(c));
-                                if (keep.length) node.setAttribute("class", keep.join(" "));
-                                else node.removeAttribute("class");
-                            }
-                            if (node.tagName === "A") {
-                                node.setAttribute("target", "_blank");
-                                node.setAttribute("rel", "noopener noreferrer");
-                            }
-                        });
-                        clean = DOMPurify.sanitize(data.content || "", {
-                            ALLOWED_TAGS: ["p", "br", "strong", "em", "u", "s", "h2", "h3", "h4", "ul", "ol", "li", "blockquote", "a"],
-                            ALLOWED_ATTR: ["href", "target", "rel", "class"]
-                        });
-                    }
-                    // Spasi khusus (&nbsp;) dari editor dijadikan spasi biasa supaya teks bisa turun baris
-                    clean = clean.replace(/&nbsp;|\u00a0/g, " ");
-                    paragraphs = `<div class="rich-content">${clean}</div>`;
+                    // Tulisan dari editor baru: font didaftarkan, HTML disaring dulu sebelum ditampilkan
+                    await loadCustomFonts();
+                    const clean = sanitizeRich(data.content || "");
+                    paragraphs = clean === null
+                        ? "<p>Isi tulisan tidak dapat ditampilkan. Muat ulang halaman.</p>"
+                        : `<div class="rich-content">${clean}</div>`;
                 } else {
                     // Tulisan lama (teks biasa): pisah per baris jadi paragraf
                     paragraphs = (data.content || "")

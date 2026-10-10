@@ -190,6 +190,9 @@
         #w-toolbar .ql-picker, #w-toolbar button { color:var(--text); }
         #w-toolbar #ed-undo, #w-toolbar #ed-redo { width:auto; padding:0 8px; font-size:18px; }
         #w-editor .ql-editor blockquote { border-left:4px solid var(--accent); padding-left:12px; margin:12px 0; }
+        #w-toolbar select.ed-select { width:auto; max-width:120px; padding:2px 4px; font-size:13px; border:1px solid var(--border); border-radius:6px; background:transparent; color:var(--text); }
+        #w-toolbar input[type=color] { width:26px; height:24px; padding:0; border:1px solid var(--border); border-radius:6px; background:transparent; cursor:pointer; vertical-align:middle; }
+        #w-toolbar .ed-tiny { font-size:11px; opacity:.7; margin-right:2px; }
         .ql-tooltip input[type=text] { width:170px; padding:3px 5px; border-radius:0; }
     </style>
 
@@ -286,6 +289,10 @@
                 <label>Isi Tulisan</label>
                 <div id="w-toolbar">
                     <span class="ql-formats">
+                        <select id="ed-font" class="ed-select" title="Font"></select>
+                        <select id="ed-size" class="ed-select" title="Ukuran huruf"></select>
+                    </span>
+                    <span class="ql-formats">
                         <select class="ql-header">
                             <option value="2">Heading 2</option>
                             <option value="3">Heading 3</option>
@@ -310,6 +317,15 @@
                     <span class="ql-formats">
                         <button class="ql-link" title="Tautan"></button>
                         <button class="ql-clean" title="Hapus format"></button>
+                    </span>
+                    <span class="ql-formats">
+                        <select class="ql-color" title="Warna teks"></select>
+                        <select class="ql-background" title="Highlight"></select>
+                    </span>
+                    <span class="ql-formats">
+                        <span class="ed-tiny">Kustom</span>
+                        <input type="color" id="ed-color" value="#000000" title="Warna teks kustom">
+                        <input type="color" id="ed-bg" value="#ffff00" title="Highlight kustom">
                     </span>
                     <span class="ql-formats">
                         <button type="button" id="ed-undo" title="Undo">↶</button>
@@ -642,6 +658,7 @@
     <script type="module">
 
         import { auth, db } from "./firebase-config.js";
+        import { sanitizeRich, loadCustomFonts, BUILTIN_FONTS, FONT_SIZES } from "./rich-content.js";
 
         import {
             GoogleAuthProvider,
@@ -807,53 +824,92 @@
         });
 
 
-        // ---- RICH TEXT EDITOR (Quill) + PENYARINGAN (DOMPurify) ----
-
-        const PURIFY = {
-            ALLOWED_TAGS: ["p", "br", "strong", "em", "u", "s", "h2", "h3", "h4", "ul", "ol", "li", "blockquote", "a"],
-            ALLOWED_ATTR: ["href", "target", "rel", "class"]
-        };
-
-        const libsReady = typeof Quill !== "undefined" && typeof DOMPurify !== "undefined";
-
-        if (libsReady) {
-            DOMPurify.addHook("afterSanitizeAttributes", (node) => {
-                if (node.hasAttribute && node.hasAttribute("class")) {
-                    const keep = node.getAttribute("class").split(/\s+/).filter(c => /^ql-align-(center|right|justify)$/.test(c));
-                    if (keep.length) node.setAttribute("class", keep.join(" "));
-                    else node.removeAttribute("class");
-                }
-                if (node.tagName === "A") {
-                    node.setAttribute("target", "_blank");
-                    node.setAttribute("rel", "noopener noreferrer");
-                }
-            });
-        }
+        // ---- RICH TEXT EDITOR (Quill) ----
+        // Penyaringan HTML dan daftar font ada di rich-content.js dan fonts/fonts.js
 
         let quill = null;
 
-        if (libsReady) {
+        async function initEditor() {
+
+            if (typeof Quill === "undefined" || typeof DOMPurify === "undefined") {
+                document.getElementById("w-editor").innerHTML =
+                    '<p style="padding:12px; color:#e53e3e;">Editor gagal dimuat. Periksa koneksi internet lalu muat ulang halaman.</p>';
+                return;
+            }
+
+            const customFonts = await loadCustomFonts();
+            const fontNames = [...BUILTIN_FONTS, ...customFonts];
+
+            // Font dan ukuran disimpan sebagai style inline (hanya nilai dari daftar)
+            const Font = Quill.import("attributors/style/font");
+            Font.whitelist = fontNames;
+            Quill.register(Font, true);
+
+            const Size = Quill.import("attributors/style/size");
+            Size.whitelist = FONT_SIZES;
+            Quill.register(Size, true);
+
+            const fontSel = document.getElementById("ed-font");
+            const sizeSel = document.getElementById("ed-size");
+
+            fontSel.innerHTML = '<option value="">Font</option>' +
+                fontNames.map(n => `<option value="${n}">${n}</option>`).join("");
+            sizeSel.innerHTML = '<option value="">Ukuran</option>' +
+                FONT_SIZES.map(z => `<option value="${z}">${parseInt(z, 10)}</option>`).join("");
+
             quill = new Quill("#w-editor", {
                 theme: "snow",
                 placeholder: "Mulai menulis...",
-                formats: ["header", "bold", "italic", "underline", "strike", "align", "list", "blockquote", "link"],
+                formats: ["header", "bold", "italic", "underline", "strike", "align", "list", "blockquote", "link", "font", "size", "color", "background"],
                 modules: {
                     toolbar: "#w-toolbar",
                     history: { userOnly: true }
                 }
             });
+
             document.getElementById("ed-undo").addEventListener("click", () => quill.history.undo());
             document.getElementById("ed-redo").addEventListener("click", () => quill.history.redo());
-        } else {
-            document.getElementById("w-editor").innerHTML =
-                '<p style="padding:12px; color:#e53e3e;">Editor gagal dimuat. Periksa koneksi internet lalu muat ulang halaman.</p>';
+
+            // Kontrol di luar Quill (select/warna kustom) mengambil fokus, jadi
+            // posisi seleksi terakhir disimpan lalu dipulihkan sebelum memberi format.
+            let lastRange = null;
+
+            function setSelectValue(sel, val) {
+                sel.value = [...sel.options].some(o => o.value === val) ? val : "";
+            }
+
+            function syncToolbar() {
+                const f = quill.getFormat();
+                setSelectValue(fontSel, f.font || "");
+                setSelectValue(sizeSel, f.size || "");
+            }
+
+            quill.on("selection-change", (range) => {
+                if (range) {
+                    lastRange = range;
+                    syncToolbar();
+                }
+            });
+
+            function applyFormat(name, value) {
+                if (lastRange) quill.setSelection(lastRange.index, lastRange.length);
+                quill.format(name, value || false);
+                syncToolbar();
+            }
+
+            fontSel.addEventListener("change", () => applyFormat("font", fontSel.value));
+            sizeSel.addEventListener("change", () => applyFormat("size", sizeSel.value));
+            document.getElementById("ed-color").addEventListener("change", (e) => applyFormat("color", e.target.value));
+            document.getElementById("ed-bg").addEventListener("change", (e) => applyFormat("background", e.target.value));
         }
+
+        initEditor();
 
         function setEditorContent(data) {
             if (!quill) return;
             if (data.contentFormat === "html") {
                 quill.setText("");
-                quill.clipboard.dangerouslyPasteHTML(DOMPurify.sanitize(data.content || "", PURIFY));
+                quill.clipboard.dangerouslyPasteHTML(sanitizeRich(data.content || "") ?? "");
             } else {
                 // Tulisan lama (teks biasa): tiap baris jadi satu paragraf
                 const text = String(data.content || "").split("\n").filter(l => l.trim()).join("\n");
@@ -1102,7 +1158,7 @@
             const description = document.getElementById("w-desc").value.trim();
             const contentText = quill ? quill.getText().trim() : "";
             const content = (quill && contentText)
-                ? DOMPurify.sanitize(quill.getSemanticHTML(), PURIFY).replace(/&nbsp;|\u00a0/g, " ")
+                ? (sanitizeRich(quill.getSemanticHTML()) ?? "")
                 : "";
 
             const photosRaw = document.getElementById("w-photos").value.trim();
