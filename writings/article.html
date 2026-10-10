@@ -255,6 +255,10 @@
             padding: 0;
         }
 
+
+        .article-meta { font-size: 14px; color: var(--text-light); margin: -12px 0 20px; }
+        .article-tags { display:flex; flex-wrap:wrap; gap:8px; margin-bottom: 24px; }
+        .article-tags a { padding:4px 12px; border:1px solid var(--accent); border-radius:999px; font-size:13px; text-decoration:none; color:var(--accent); text-transform:capitalize; }
     </style>
 
 </head>
@@ -432,18 +436,40 @@
                     referencesHtml += `</div></div>`;
                 }
 
-                const categoryLabel = data.category
-                    ? data.category.toUpperCase()
+                const esc = (t) => String(t).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+                // Tanggal publikasi (dari createdAt yang sudah ada)
+                const dateText = data.createdAt
+                    ? data.createdAt.toDate().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
                     : "";
+
+                // Perkiraan waktu baca: kata / 250, dibulatkan ke atas
+                const words = (data.content || "").trim().split(/\s+/).filter(Boolean).length;
+                const minutes = Math.max(1, Math.ceil(words / 250));
+
+                const metaHtml = `<p class="article-meta">${dateText ? "Published " + dateText + " · " : ""}${minutes} min read</p>`;
+
+                // Tags (artikel lama belum punya tags)
+                const tags = Array.isArray(data.tags) ? data.tags : [];
+                const tagsHtml = tags.length
+                    ? `<div class="article-tags">${tags.map(t => `<a href="index.html?tag=${encodeURIComponent(t)}">${esc(t)}</a>`).join("")}</div>`
+                    : "";
+
+                // Label & tombol kembali: pakai kategori lama kalau ada, kalau tidak ke daftar tulisan
+                const categoryLabel = data.category ? data.category.toUpperCase() : "WRITING";
+                const backHref = data.category ? `${data.category}.html` : "index.html";
+                const backLabel = data.category ? categoryLabel : "Writings";
 
                 contentEl.innerHTML = `
                     <p class="writing-category">${categoryLabel}</p>
                     <h2>${data.title}</h2>
+                    ${metaHtml}
+                    ${tagsHtml}
                     ${photosHtml}
                     ${paragraphs}
                     ${referencesHtml}
                     <p style="margin-top:30px;">
-                        <a class="back-link" href="${data.category}.html">← Back to ${categoryLabel}</a>
+                        <a class="back-link" href="${backHref}">← Back to ${backLabel}</a>
                     </p>
                 `;
 

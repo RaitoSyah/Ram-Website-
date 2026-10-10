@@ -169,6 +169,9 @@
             margin-top: 2px;
         }
 
+
+        .tag-suggestions { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+        .tag-chip { padding:4px 10px; border:1px solid var(--border, #ccc); border-radius:999px; font-size:13px; cursor:pointer; background:transparent; color:inherit; text-transform:capitalize; }
     </style>
 
 </head>
@@ -178,7 +181,7 @@
 
     <header>
 
-        <h1>Ramdhan's Corner</h1>
+        <h1>Raito Syah</h1>
 
         <nav>
             <a href="index.html">Home</a>
@@ -230,14 +233,9 @@
             </div>
 
             <div class="admin-field">
-                <label for="w-category">Kategori</label>
-                <select id="w-category">
-                    <option value="psychology">Psychology</option>
-                    <option value="technology">Technology & Computer Science</option>
-                    <option value="society">Society</option>
-                    <option value="curiosity">Curiosity</option>
-                    <option value="personal">Personal</option>
-                </select>
+                <label for="w-tags">Tags (pisahkan dengan koma)</label>
+                <input type="text" id="w-tags" placeholder="gender, psychology, society">
+                <div id="tag-suggestions" class="tag-suggestions"></div>
             </div>
 
             <div class="admin-field">
@@ -652,6 +650,7 @@
                 document.getElementById("admin-name").textContent = user.displayName || user.email;
                 populateGameDropdown();
                 populateMusicDropdown();
+                loadTagSuggestions();
             } else {
                 visitorPanel.style.display = "block";
                 document.getElementById("visitor-avatar").src = user.photoURL || "";
@@ -740,11 +739,52 @@
         });
 
 
+        // ---- TAGS ----
+        // Disimpan huruf kecil supaya "Psychology" dan "psychology" tidak jadi dua tag.
+        function normalizeTag(t) {
+            return t.toLowerCase().replace(/\s+/g, " ").trim();
+        }
+
+        function parseTags(raw) {
+            const seen = new Set();
+            raw.split(",").forEach(t => {
+                const n = normalizeTag(t);
+                if (n) seen.add(n);
+            });
+            return [...seen];
+        }
+
+        async function loadTagSuggestions() {
+            const box = document.getElementById("tag-suggestions");
+            try {
+                const snap = await getDocs(collection(db, "writings"));
+                const all = new Set();
+                snap.forEach(d => (d.data().tags || []).forEach(t => all.add(t)));
+                box.innerHTML = "";
+                [...all].sort().forEach(t => {
+                    const b = document.createElement("button");
+                    b.type = "button";
+                    b.className = "tag-chip";
+                    b.textContent = t;
+                    b.addEventListener("click", () => {
+                        const input = document.getElementById("w-tags");
+                        const cur = parseTags(input.value);
+                        if (!cur.includes(t)) cur.push(t);
+                        input.value = cur.join(", ");
+                    });
+                    box.appendChild(b);
+                });
+            } catch (e) {
+                box.textContent = "";
+            }
+        }
+
+
         // ---- SUBMIT WRITING (admin only, tapi rules Firestore yang jamin keamanannya) ----
 
         document.getElementById("submit-writing-btn").addEventListener("click", async () => {
 
-            const category = document.getElementById("w-category").value;
+            const tags = parseTags(document.getElementById("w-tags").value);
             const title = document.getElementById("w-title").value.trim();
             const description = document.getElementById("w-desc").value.trim();
             const content = document.getElementById("w-content").value.trim();
@@ -777,7 +817,7 @@
             try {
 
                 await addDoc(collection(db, "writings"), {
-                    category,
+                    tags,
                     title,
                     description,
                     content,
@@ -790,6 +830,8 @@
                 writingStatus.className = "admin-status success";
 
                 document.getElementById("w-title").value = "";
+                document.getElementById("w-tags").value = "";
+                loadTagSuggestions();
                 document.getElementById("w-desc").value = "";
                 document.getElementById("w-content").value = "";
                 document.getElementById("w-photos").value = "";
