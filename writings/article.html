@@ -452,7 +452,7 @@
                 // Tags (artikel lama belum punya tags)
                 const tags = Array.isArray(data.tags) ? data.tags : [];
                 const tagsHtml = tags.length
-                    ? `<div class="article-tags">${tags.map(t => `<a href="index.html?tag=${encodeURIComponent(t)}">${esc(t)}</a>`).join("")}</div>`
+                    ? `<div class="article-tags">${tags.map(t => `<a href="all.html?tag=${encodeURIComponent(t)}">${esc(t)}</a>`).join("")}</div>`
                     : "";
 
                 // Label & tombol kembali: pakai kategori lama kalau ada, kalau tidak ke daftar tulisan

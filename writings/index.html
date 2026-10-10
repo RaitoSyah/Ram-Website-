@@ -30,9 +30,10 @@
         .search-row input::-webkit-search-decoration { -webkit-appearance:none; appearance:none; display:none; }
         .search-row button { padding:10px 14px; border:1px solid var(--border, #ccc); border-radius:8px; background:transparent; color:inherit; cursor:pointer; font-family:inherit; }
         .tag-row { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
-        .tag-pill { padding:4px 12px; border:1px solid var(--accent); border-radius:999px; font-size:13px; color:var(--accent); background:transparent; cursor:pointer; text-transform:capitalize; font-family:inherit; }
+        .tag-pill { display:inline-block; padding:4px 12px; border:1px solid var(--accent); border-radius:999px; font-size:13px; color:var(--accent); background:transparent; cursor:pointer; text-transform:capitalize; font-family:inherit; text-decoration:none; }
         .card-meta { font-size:13px; color:var(--text-light); margin:0 0 8px; }
         .result-info { font-size:14px; color:var(--text-light); margin:12px 0; }
+        .more-btn { display:block; width:100%; margin-top:16px; padding:12px; border:1px solid var(--border, #ccc); border-radius:8px; background:transparent; color:inherit; cursor:pointer; font-size:15px; font-family:inherit; }
     </style>
 
 </head>
@@ -78,20 +79,20 @@
         </section>
 
 
-        <!-- SEARCH -->
+
+        <!-- SEARCH (hasilnya dibuka di all.html) -->
 
         <section>
-            <div class="search-row">
-                <input type="search" id="search-input" placeholder="Cari judul, tags, atau isi tulisan..." autocomplete="off">
-                <button type="button" id="search-clear" style="display:none;">✕</button>
-            </div>
-            <div id="active-filter" class="result-info" style="display:none;"></div>
+            <form action="all.html" method="get" class="search-row">
+                <input type="search" name="q" placeholder="Cari judul, tags, atau isi tulisan..." autocomplete="off">
+                <button type="submit">Cari</button>
+            </form>
         </section>
 
 
         <!-- LATEST WRITING -->
 
-        <section id="latest-section">
+        <section>
             <h2>Latest Writing</h2>
             <div id="latest-writing">
                 <p style="color:var(--text-light); font-size:14px;">Memuat tulisan terbaru...</p>
@@ -102,30 +103,19 @@
         <!-- ALL WRITINGS -->
 
         <section>
-            <h2 id="all-title">All Writings</h2>
-            <div id="all-writings"></div>
-        </section>
-
-
-        <!-- POPULAR TAGS -->
-
-        <section id="tags-section" style="display:none;">
-            <h2>Popular Tags</h2>
-            <div class="tag-row" id="popular-tags"></div>
+            <article class="writing-card">
+                <p class="writing-category">ARCHIVE</p>
+                <h3>All Writings</h3>
+                <p>Semua tulisanku, lengkap dengan pencarian dan tags.</p>
+                <a href="all.html">Lihat semua →</a>
+            </article>
         </section>
 
 
         <!-- BACK TO HOME -->
 
         <p>
-
-            <a
-                class="back-link"
-                href="../index.html"
-            >
-                ← Back to Home
-            </a>
-
+            <a class="back-link" href="../index.html">← Back to Home</a>
         </p>
 
     </main>
@@ -148,28 +138,19 @@
             collection,
             query,
             orderBy,
+            limit,
             getDocs
         } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 
-        const latestEl = document.getElementById("latest-writing");
-        const latestSection = document.getElementById("latest-section");
-        const allEl = document.getElementById("all-writings");
-        const allTitle = document.getElementById("all-title");
-        const searchInput = document.getElementById("search-input");
-        const clearBtn = document.getElementById("search-clear");
-        const filterInfo = document.getElementById("active-filter");
-        const tagsSection = document.getElementById("tags-section");
-        const popularTagsEl = document.getElementById("popular-tags");
-
-        let writings = [];
-        let activeTag = "";
+        // Tautan lama index.html?tag=... diteruskan ke halaman daftar
+        const oldTag = new URL(location.href).searchParams.get("tag");
+        if (oldTag) location.replace("all.html?tag=" + encodeURIComponent(oldTag));
 
 
         const esc = (t) => String(t ?? "").replace(/[&<>"']/g, c => ({
             "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
         }[c]));
-
 
         // Artikel lama belum punya tags: pakai kategori lamanya sebagai tag sementara
         function tagsOf(data) {
@@ -188,11 +169,27 @@
                 : "";
         }
 
-        function cardHtml(w) {
+        function toItem(d) {
+            const data = d.data();
+            return {
+                id: d.id,
+                title: data.title || "",
+                description: data.description || "",
+                content: data.content || "",
+                createdAt: data.createdAt,
+                tags: tagsOf(data).map(t => String(t).toLowerCase()),
+                minutes: readMinutes(data.content)
+            };
+        }
+
+        function cardHtml(w, tagMode) {
             const dateText = formatDate(w.createdAt);
             const meta = (dateText ? dateText + " · " : "") + w.minutes + " min read";
+            const pill = (t) => tagMode === "link"
+                ? `<a class="tag-pill" href="all.html?tag=${encodeURIComponent(t)}">${esc(t)}</a>`
+                : `<button type="button" class="tag-pill" data-tag="${esc(t)}">${esc(t)}</button>`;
             const tagsHtml = w.tags.length
-                ? `<div class="tag-row" style="margin:0 0 12px;">${w.tags.map(t => `<button type="button" class="tag-pill" data-tag="${esc(t)}">${esc(t)}</button>`).join("")}</div>`
+                ? `<div class="tag-row" style="margin:0 0 12px;">${w.tags.map(pill).join("")}</div>`
                 : "";
             return `
                 <article class="writing-card">
@@ -206,135 +203,31 @@
         }
 
 
-        function render() {
+        const latestEl = document.getElementById("latest-writing");
 
-            const term = searchInput.value.trim().toLowerCase();
-            const filtering = term !== "" || activeTag !== "";
-
-            clearBtn.style.display = filtering ? "block" : "none";
-            latestSection.style.display = filtering ? "none" : "block";
-
-            if (activeTag) {
-                filterInfo.style.display = "block";
-                filterInfo.textContent = "Tag: " + activeTag;
-            } else {
-                filterInfo.style.display = "none";
-            }
-
-            const results = writings.filter(w => {
-                if (activeTag && !w.tags.includes(activeTag)) return false;
-                if (!term) return true;
-                return w.title.toLowerCase().includes(term)
-                    || w.tags.some(t => t.includes(term))
-                    || w.description.toLowerCase().includes(term)
-                    || w.content.toLowerCase().includes(term);
-            });
-
-            allTitle.textContent = filtering
-                ? `Hasil (${results.length})`
-                : "All Writings";
-
-            if (!results.length) {
-                allEl.innerHTML = `
-                    <article class="writing-card">
-                        <h3>Tidak ada hasil</h3>
-                        <p>Coba kata kunci lain, atau hapus pencarian untuk melihat semua tulisan.</p>
-                    </article>
-                `;
-                return;
-            }
-
-            allEl.innerHTML = results.map(cardHtml).join("");
-        }
-
-
-        function renderLatest() {
-            if (!writings.length) {
-                latestEl.innerHTML = `
-                    <article class="writing-card">
-                        <h3>Belum Ada Tulisan</h3>
-                        <p>Tulisan pertamaku akan muncul di sini.</p>
-                    </article>
-                `;
-                return;
-            }
-            latestEl.innerHTML = cardHtml(writings[0]);
-        }
-
-
-        function renderPopularTags() {
-            const count = {};
-            writings.forEach(w => w.tags.forEach(t => { count[t] = (count[t] || 0) + 1; }));
-            const top = Object.entries(count)
-                .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-                .slice(0, 12);
-            if (!top.length) return;
-            tagsSection.style.display = "block";
-            popularTagsEl.innerHTML = top
-                .map(([t, n]) => `<button type="button" class="tag-pill" data-tag="${esc(t)}">${esc(t)} (${n})</button>`)
-                .join("");
-        }
-
-
-        function setTag(tag) {
-            activeTag = tag;
-            searchInput.value = "";
-            const url = new URL(location.href);
-            if (tag) url.searchParams.set("tag", tag); else url.searchParams.delete("tag");
-            history.replaceState(null, "", url);
-            render();
-            window.scrollTo({ top: 0, behavior: "smooth" });
-        }
-
-
-        // Klik tag di mana pun (kartu atau Popular Tags)
-        document.addEventListener("click", (e) => {
-            const btn = e.target.closest("[data-tag]");
-            if (btn) setTag(btn.dataset.tag);
-        });
-
-        searchInput.addEventListener("input", render);
-
-        clearBtn.addEventListener("click", () => {
-            searchInput.value = "";
-            setTag("");
-        });
-
-
-        async function load() {
+        async function loadLatest() {
             try {
-                const q = query(collection(db, "writings"), orderBy("createdAt", "desc"));
+                const q = query(collection(db, "writings"), orderBy("createdAt", "desc"), limit(1));
                 const snapshot = await getDocs(q);
 
-                writings = snapshot.docs.map(d => {
-                    const data = d.data();
-                    return {
-                        id: d.id,
-                        title: data.title || "",
-                        description: data.description || "",
-                        content: data.content || "",
-                        createdAt: data.createdAt,
-                        tags: tagsOf(data).map(t => String(t).toLowerCase()),
-                        minutes: readMinutes(data.content)
-                    };
-                });
+                if (snapshot.empty) {
+                    latestEl.innerHTML = `
+                        <article class="writing-card">
+                            <h3>Belum Ada Tulisan</h3>
+                            <p>Tulisan pertamaku akan muncul di sini.</p>
+                        </article>
+                    `;
+                    return;
+                }
 
-                activeTag = (new URL(location.href).searchParams.get("tag") || "").toLowerCase();
-
-                renderLatest();
-                renderPopularTags();
-                render();
+                latestEl.innerHTML = cardHtml(toItem(snapshot.docs[0]), "link");
 
             } catch (error) {
-                latestEl.innerHTML = `
-                    <p style="color:#e53e3e; font-size:14px;">
-                        Gagal memuat: ${esc(error.message)}
-                    </p>
-                `;
+                latestEl.innerHTML = `<p style="color:#e53e3e; font-size:14px;">Gagal memuat: ${esc(error.message)}</p>`;
             }
         }
 
-        load();
+        loadLatest();
 
     </script>
 

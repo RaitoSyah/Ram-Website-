@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>All Writings - Raito Syah</title>
+
+      <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-QSZT4P4PVP"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-QSZT4P4PVP');
+    </script>
+
+    <link rel="stylesheet" href="../style.css">
+
+    <style>
+        .search-row { display:flex; gap:8px; margin-top:4px; }
+        .search-row input { flex:1; min-width:0; padding:10px 12px; font-size:16px; border:1px solid var(--border, #ccc); border-radius:8px; background:transparent; color:inherit; font-family:inherit; }
+        .search-row input::-webkit-search-cancel-button,
+        .search-row input::-webkit-search-decoration { -webkit-appearance:none; appearance:none; display:none; }
+        .search-row button { padding:10px 14px; border:1px solid var(--border, #ccc); border-radius:8px; background:transparent; color:inherit; cursor:pointer; font-family:inherit; }
+        .tag-row { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+        .tag-pill { display:inline-block; padding:4px 12px; border:1px solid var(--accent); border-radius:999px; font-size:13px; color:var(--accent); background:transparent; cursor:pointer; text-transform:capitalize; font-family:inherit; text-decoration:none; }
+        .card-meta { font-size:13px; color:var(--text-light); margin:0 0 8px; }
+        .result-info { font-size:14px; color:var(--text-light); margin:12px 0; }
+        .more-btn { display:block; width:100%; margin-top:16px; padding:12px; border:1px solid var(--border, #ccc); border-radius:8px; background:transparent; color:inherit; cursor:pointer; font-size:15px; font-family:inherit; }
+    </style>
+
+</head>
+
+
+<body>
+
+    <header>
+
+        <h1>Raito Syah</h1>
+
+        <nav>
+
+            <a href="../index.html">Home</a>
+
+            <a href="../index.html#about">About</a>
+
+            <a href="index.html">Writings</a>
+
+        </nav>
+
+    </header>
+
+
+    <main>
+
+        <section>
+            <p class="writing-category">RAMDHAN'S WRITINGS</p>
+            <h2>All Writings</h2>
+        </section>
+
+
+        <!-- SEARCH -->
+
+        <section>
+            <div class="search-row">
+                <input type="search" id="search-input" placeholder="Cari judul, tags, atau isi tulisan..." autocomplete="off">
+                <button type="button" id="search-clear" style="display:none;">✕</button>
+            </div>
+            <div id="active-filter" class="result-info" style="display:none;"></div>
+        </section>
+
+
+        <!-- POPULAR TAGS -->
+
+        <section id="tags-section" style="display:none;">
+            <h2>Popular Tags</h2>
+            <div class="tag-row" id="popular-tags"></div>
+        </section>
+
+
+        <!-- LIST -->
+
+        <section>
+            <h2 id="list-title">Memuat...</h2>
+            <div id="all-writings"></div>
+            <button type="button" class="more-btn" id="more-btn" style="display:none;"></button>
+        </section>
+
+
+        <p>
+            <a class="back-link" href="index.html">← Back to Writings</a>
+        </p>
+
+    </main>
+
+
+    <footer>
+
+        <p>
+            © 2026 Ramdhan
+        </p>
+
+    </footer>
+
+
+    <script type="module">
+
+        import { db } from "../firebase-config.js";
+
+        import {
+            collection,
+            query,
+            orderBy,
+            getDocs
+        } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+
+        const esc = (t) => String(t ?? "").replace(/[&<>"']/g, c => ({
+            "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+        }[c]));
+
+        // Artikel lama belum punya tags: pakai kategori lamanya sebagai tag sementara
+        function tagsOf(data) {
+            if (Array.isArray(data.tags) && data.tags.length) return data.tags;
+            return data.category ? [String(data.category).toLowerCase()] : [];
+        }
+
+        function readMinutes(content) {
+            const words = (content || "").trim().split(/\s+/).filter(Boolean).length;
+            return Math.max(1, Math.ceil(words / 250));
+        }
+
+        function formatDate(ts) {
+            return ts && ts.toDate
+                ? ts.toDate().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+                : "";
+        }
+
+        function toItem(d) {
+            const data = d.data();
+            return {
+                id: d.id,
+                title: data.title || "",
+                description: data.description || "",
+                content: data.content || "",
+                createdAt: data.createdAt,
+                tags: tagsOf(data).map(t => String(t).toLowerCase()),
+                minutes: readMinutes(data.content)
+            };
+        }
+
+        function cardHtml(w, tagMode) {
+            const dateText = formatDate(w.createdAt);
+            const meta = (dateText ? dateText + " · " : "") + w.minutes + " min read";
+            const pill = (t) => tagMode === "link"
+                ? `<a class="tag-pill" href="all.html?tag=${encodeURIComponent(t)}">${esc(t)}</a>`
+                : `<button type="button" class="tag-pill" data-tag="${esc(t)}">${esc(t)}</button>`;
+            const tagsHtml = w.tags.length
+                ? `<div class="tag-row" style="margin:0 0 12px;">${w.tags.map(pill).join("")}</div>`
+                : "";
+            return `
+                <article class="writing-card">
+                    <h3>${esc(w.title)}</h3>
+                    <p class="card-meta">${esc(meta)}</p>
+                    <p>${esc(w.description)}</p>
+                    ${tagsHtml}
+                    <a href="article.html?id=${encodeURIComponent(w.id)}">Read this →</a>
+                </article>
+            `;
+        }
+
+
+        const PAGE_SIZE = 10;
+
+        const allEl = document.getElementById("all-writings");
+        const listTitle = document.getElementById("list-title");
+        const searchInput = document.getElementById("search-input");
+        const clearBtn = document.getElementById("search-clear");
+        const filterInfo = document.getElementById("active-filter");
+        const tagsSection = document.getElementById("tags-section");
+        const popularTagsEl = document.getElementById("popular-tags");
+        const moreBtn = document.getElementById("more-btn");
+
+        let writings = [];
+        let activeTag = "";
+        let shown = PAGE_SIZE;
+
+
+        function render() {
+
+            const term = searchInput.value.trim().toLowerCase();
+            const filtering = term !== "" || activeTag !== "";
+
+            clearBtn.style.display = filtering ? "block" : "none";
+
+            if (activeTag) {
+                filterInfo.style.display = "block";
+                filterInfo.textContent = "Tag: " + activeTag;
+            } else {
+                filterInfo.style.display = "none";
+            }
+
+            const results = writings.filter(w => {
+                if (activeTag && !w.tags.includes(activeTag)) return false;
+                if (!term) return true;
+                return w.title.toLowerCase().includes(term)
+                    || w.tags.some(t => t.includes(term))
+                    || w.description.toLowerCase().includes(term)
+                    || w.content.toLowerCase().includes(term);
+            });
+
+            listTitle.textContent = filtering
+                ? `Hasil (${results.length})`
+                : `Semua Tulisan (${results.length})`;
+
+            if (!results.length) {
+                allEl.innerHTML = `
+                    <article class="writing-card">
+                        <h3>Tidak ada hasil</h3>
+                        <p>Coba kata kunci lain, atau hapus pencarian untuk melihat semua tulisan.</p>
+                    </article>
+                `;
+                moreBtn.style.display = "none";
+                return;
+            }
+
+            allEl.innerHTML = results.slice(0, shown).map(w => cardHtml(w, "button")).join("");
+
+            if (results.length > shown) {
+                moreBtn.style.display = "block";
+                moreBtn.textContent = `Muat lebih banyak (${results.length - shown} lagi)`;
+            } else {
+                moreBtn.style.display = "none";
+            }
+        }
+
+
+        function renderPopularTags() {
+            const count = {};
+            writings.forEach(w => w.tags.forEach(t => { count[t] = (count[t] || 0) + 1; }));
+            const top = Object.entries(count)
+                .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+                .slice(0, 12);
+            if (!top.length) return;
+            tagsSection.style.display = "block";
+            popularTagsEl.innerHTML = top
+                .map(([t, n]) => `<button type="button" class="tag-pill" data-tag="${esc(t)}">${esc(t)} (${n})</button>`)
+                .join("");
+        }
+
+
+        function setTag(tag) {
+            activeTag = tag;
+            shown = PAGE_SIZE;
+            searchInput.value = "";
+            const url = new URL(location.href);
+            url.searchParams.delete("q");
+            if (tag) url.searchParams.set("tag", tag); else url.searchParams.delete("tag");
+            history.replaceState(null, "", url);
+            render();
+            window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+
+
+        document.addEventListener("click", (e) => {
+            const btn = e.target.closest("[data-tag]");
+            if (btn) setTag(btn.dataset.tag);
+        });
+
+        searchInput.addEventListener("input", () => { shown = PAGE_SIZE; render(); });
+
+        clearBtn.addEventListener("click", () => {
+            searchInput.value = "";
+            setTag("");
+        });
+
+        moreBtn.addEventListener("click", () => { shown += PAGE_SIZE; render(); });
+
+
+        async function load() {
+            try {
+                const q = query(collection(db, "writings"), orderBy("createdAt", "desc"));
+                const snapshot = await getDocs(q);
+                writings = snapshot.docs.map(toItem);
+
+                const params = new URL(location.href).searchParams;
+                activeTag = (params.get("tag") || "").toLowerCase();
+                searchInput.value = params.get("q") || "";
+
+                renderPopularTags();
+                render();
+
+            } catch (error) {
+                listTitle.textContent = "Gagal memuat";
+                allEl.innerHTML = `<p style="color:#e53e3e; font-size:14px;">${esc(error.message)}</p>`;
+            }
+        }
+
+        load();
+
+    </script>
+
+<script type="module" src="../auth-widget.js"></script>
+</body>
+
+</html>
