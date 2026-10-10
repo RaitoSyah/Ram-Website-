@@ -447,7 +447,16 @@
                 const words = (data.content || "").trim().split(/\s+/).filter(Boolean).length;
                 const minutes = Math.max(1, Math.ceil(words / 250));
 
-                const metaHtml = `<p class="article-meta">${dateText ? "Published " + dateText + " · " : ""}${minutes} min read</p>`;
+                const updatedText = data.updatedAt && data.updatedAt.toDate
+                    ? data.updatedAt.toDate().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+                    : "";
+
+                const metaParts = [];
+                if (dateText) metaParts.push("Published " + dateText);
+                if (updatedText && updatedText !== dateText) metaParts.push("Updated " + updatedText);
+                metaParts.push(minutes + " min read");
+
+                const metaHtml = `<p class="article-meta">${metaParts.join(" · ")}</p>`;
 
                 // Tags (artikel lama belum punya tags)
                 const tags = Array.isArray(data.tags) ? data.tags : [];

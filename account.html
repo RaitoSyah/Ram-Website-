@@ -172,6 +172,13 @@
 
         .tag-suggestions { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
         .tag-chip { padding:4px 10px; border:1px solid var(--border, #ccc); border-radius:999px; font-size:13px; cursor:pointer; background:transparent; color:inherit; text-transform:capitalize; }
+
+        .writing-list-item { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--border, #ddd); }
+        .writing-list-item .wl-title { font-weight:600; font-size:15px; margin:0; word-break:break-word; }
+        .writing-list-item .wl-meta { font-size:12px; opacity:.7; margin:2px 0 0; }
+        .writing-list-item button { flex-shrink:0; padding:6px 12px; border:1px solid var(--border, #ccc); border-radius:8px; background:transparent; color:inherit; cursor:pointer; font-family:inherit; }
+        #edit-banner { display:none; padding:10px 12px; border:1px solid var(--accent, #888); border-radius:8px; margin-bottom:16px; font-size:14px; }
+        #edit-banner button { margin-left:8px; padding:4px 10px; border:1px solid var(--border, #ccc); border-radius:8px; background:transparent; color:inherit; cursor:pointer; font-family:inherit; }
     </style>
 
 </head>
@@ -228,8 +235,18 @@
             </div>
 
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-                <h2 style="margin:0;">Tambah Writing</h2>
+                <h2 style="margin:0;" id="writing-heading">Tambah Writing</h2>
                 <button id="logout-btn-admin">Logout</button>
+            </div>
+
+            <div class="admin-field">
+                <label>Kelola Tulisan (ketuk Edit untuk mengubah)</label>
+                <div id="writing-list"><p style="font-size:14px; opacity:.7;">Memuat...</p></div>
+            </div>
+
+            <div id="edit-banner">
+                Mengedit: <strong id="edit-title"></strong>
+                <button type="button" id="cancel-edit-btn">Batal edit</button>
             </div>
 
             <div class="admin-field">
@@ -590,6 +607,7 @@
             getDocs,
             query,
             where,
+            orderBy,
             doc,
             updateDoc,
             serverTimestamp
@@ -651,6 +669,7 @@
                 populateGameDropdown();
                 populateMusicDropdown();
                 loadTagSuggestions();
+                loadWritingList();
             } else {
                 visitorPanel.style.display = "block";
                 document.getElementById("visitor-avatar").src = user.photoURL || "";
@@ -739,6 +758,140 @@
         });
 
 
+        // ---- EDIT TULISAN ----
+
+        let editingId = null;
+        const writingMap = new Map();
+
+        const REF_OPTIONS = ["instagram", "youtube", "tiktok", "threads", "x", "journal", "article", "other"];
+
+        function makeRefRow(ref) {
+            const row = document.createElement("div");
+            row.className = "reference-input-row";
+            row.innerHTML = `
+                <select class="ref-type">
+                    <option value="instagram">Instagram</option>
+                    <option value="youtube">YouTube</option>
+                    <option value="tiktok">TikTok</option>
+                    <option value="threads">Threads</option>
+                    <option value="x">X (Twitter)</option>
+                    <option value="journal">Journal</option>
+                    <option value="article">Article</option>
+                    <option value="other">Other</option>
+                </select>
+                <input type="text" class="ref-title" placeholder="Judul referensi">
+                <input type="text" class="ref-url" placeholder="URL">
+                <button type="button" class="remove-reference-btn">✕</button>
+            `;
+            if (ref) {
+                if (REF_OPTIONS.includes(ref.type)) row.querySelector(".ref-type").value = ref.type;
+                row.querySelector(".ref-title").value = ref.title || "";
+                row.querySelector(".ref-url").value = ref.url || "";
+            }
+            return row;
+        }
+
+        function exitEditMode() {
+            editingId = null;
+            document.getElementById("edit-banner").style.display = "none";
+            document.getElementById("writing-heading").textContent = "Tambah Writing";
+            document.getElementById("submit-writing-btn").textContent = "Submit Writing";
+        }
+
+        function startEdit(id) {
+            const data = writingMap.get(id);
+            if (!data) return;
+
+            editingId = id;
+
+            document.getElementById("w-title").value = data.title || "";
+            document.getElementById("w-desc").value = data.description || "";
+            document.getElementById("w-content").value = data.content || "";
+            document.getElementById("w-photos").value = (data.photos || []).join("\n");
+
+            // Tulisan lama belum punya tags: isi dengan kategori lamanya sebagai usulan
+            const tags = Array.isArray(data.tags) && data.tags.length
+                ? data.tags
+                : (data.category ? [String(data.category).toLowerCase()] : []);
+            document.getElementById("w-tags").value = tags.join(", ");
+
+            const container = document.getElementById("reference-inputs");
+            container.innerHTML = "";
+            const refs = Array.isArray(data.references) && data.references.length ? data.references : [null];
+            refs.forEach(r => container.appendChild(makeRefRow(r)));
+
+            document.getElementById("edit-title").textContent = data.title || "(tanpa judul)";
+            document.getElementById("edit-banner").style.display = "block";
+            document.getElementById("writing-heading").textContent = "Edit Writing";
+            document.getElementById("submit-writing-btn").textContent = "Simpan Perubahan";
+            writingStatus.textContent = "";
+
+            document.getElementById("edit-banner").scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+
+        function cancelEdit() {
+            exitEditMode();
+            document.getElementById("w-title").value = "";
+            document.getElementById("w-desc").value = "";
+            document.getElementById("w-content").value = "";
+            document.getElementById("w-photos").value = "";
+            document.getElementById("w-tags").value = "";
+            const container = document.getElementById("reference-inputs");
+            container.innerHTML = "";
+            container.appendChild(makeRefRow(null));
+            writingStatus.textContent = "";
+        }
+
+        async function loadWritingList() {
+            const listEl = document.getElementById("writing-list");
+            try {
+                const snap = await getDocs(query(collection(db, "writings"), orderBy("createdAt", "desc")));
+                writingMap.clear();
+                listEl.innerHTML = "";
+
+                if (snap.empty) {
+                    listEl.innerHTML = '<p style="font-size:14px; opacity:.7;">Belum ada tulisan.</p>';
+                    return;
+                }
+
+                snap.forEach(d => {
+                    const data = d.data();
+                    writingMap.set(d.id, data);
+
+                    const date = data.createdAt && data.createdAt.toDate
+                        ? data.createdAt.toDate().toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })
+                        : "";
+
+                    const item = document.createElement("div");
+                    item.className = "writing-list-item";
+
+                    const info = document.createElement("div");
+                    const t = document.createElement("p");
+                    t.className = "wl-title";
+                    t.textContent = data.title || "(tanpa judul)";
+                    const m = document.createElement("p");
+                    m.className = "wl-meta";
+                    m.textContent = date;
+                    info.appendChild(t);
+                    info.appendChild(m);
+
+                    const btn = document.createElement("button");
+                    btn.type = "button";
+                    btn.textContent = "Edit";
+                    btn.addEventListener("click", () => startEdit(d.id));
+
+                    item.appendChild(info);
+                    item.appendChild(btn);
+                    listEl.appendChild(item);
+                });
+            } catch (e) {
+                listEl.innerHTML = '<p style="font-size:14px; color:#e53e3e;">Gagal memuat daftar: ' + String(e.message).replace(/[<>&]/g, "") + '</p>';
+            }
+        }
+
+        document.getElementById("cancel-edit-btn").addEventListener("click", cancelEdit);
+
+
         // ---- TAGS ----
         // Disimpan huruf kecil supaya "Psychology" dan "psychology" tidak jadi dua tag.
         function normalizeTag(t) {
@@ -816,21 +969,36 @@
 
             try {
 
-                await addDoc(collection(db, "writings"), {
-                    tags,
-                    title,
-                    description,
-                    content,
-                    photos,
-                    references,
-                    createdAt: serverTimestamp()
-                });
+                if (editingId) {
+                    // Edit: createdAt (tanggal publikasi) tidak disentuh, hanya updatedAt yang baru
+                    await updateDoc(doc(db, "writings", editingId), {
+                        tags,
+                        title,
+                        description,
+                        content,
+                        photos,
+                        references,
+                        updatedAt: serverTimestamp()
+                    });
+                } else {
+                    await addDoc(collection(db, "writings"), {
+                        tags,
+                        title,
+                        description,
+                        content,
+                        photos,
+                        references,
+                        createdAt: serverTimestamp()
+                    });
+                }
 
-                writingStatus.textContent = "Berhasil disimpan!";
+                writingStatus.textContent = editingId ? "Perubahan disimpan!" : "Berhasil disimpan!";
                 writingStatus.className = "admin-status success";
 
                 document.getElementById("w-title").value = "";
                 document.getElementById("w-tags").value = "";
+                exitEditMode();
+                loadWritingList();
                 loadTagSuggestions();
                 document.getElementById("w-desc").value = "";
                 document.getElementById("w-content").value = "";
