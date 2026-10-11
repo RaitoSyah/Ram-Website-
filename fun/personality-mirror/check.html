@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex">
+    <title>Pemeriksa skenario</title>
+    <link rel="stylesheet" href="../../style.css">
+    <link rel="stylesheet" href="mirror.css">
+</head>
+<body>
+<main>
+    <section>
+        <p class="writing-category">ALAT PEMERIKSA</p>
+        <h2>Pemeriksa skenario</h2>
+        <p>Halaman ini memeriksa <code>scenarios.js</code>. Aman dibuka kapan saja, tidak mengubah apa pun.</p>
+        <div id="out">Memeriksa...</div>
+        <p><a class="back-link" href="index.html">← Ke Personality Mirror</a></p>
+    </section>
+</main>
+<script type="module">
+    import { SCENARIOS, SCENARIOS_VERSION, IS_PLACEHOLDER } from "./scenarios.js";
+    import { validateScenarios, playOrder, TRAIT_IDS, codeLength } from "./engine.js";
+
+    const esc = (t) => String(t ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+    const out = document.getElementById("out");
+
+    try {
+        const r = validateScenarios(SCENARIOS);
+        const ok = r.errors.length === 0;
+
+        const rows = TRAIT_IDS.map(t => {
+            const p = r.perTrait[t] || { count: 0, facets: [] };
+            return `<tr><td>${t}</td><td>${p.count}</td><td>${esc(p.facets.join(", "))}</td></tr>`;
+        }).join("");
+
+        out.innerHTML = `
+            <p><strong>${ok ? "Lolos: tidak ada kesalahan data." : "Ada " + r.errors.length + " kesalahan yang harus diperbaiki."}</strong></p>
+            <p>Jumlah skenario: ${SCENARIOS.length} · Versi: ${SCENARIOS_VERSION} · Panjang kode: ${codeLength(SCENARIOS.length)} karakter</p>
+            ${IS_PLACEHOLDER ? "<p>⚠️ <code>IS_PLACEHOLDER</code> masih <code>true</code> (mode uji). Ubah ke <code>false</code> kalau skenario sudah asli.</p>" : ""}
+            <h3>Per dimensi</h3>
+            <div class="pm-tablewrap"><table class="pm-table"><thead><tr><th>Dimensi</th><th>Jumlah</th><th>Facet</th></tr></thead><tbody>${rows}</tbody></table></div>
+            <h3>Kesalahan (${r.errors.length})</h3>
+            ${r.errors.length ? "<ul>" + r.errors.map(e => "<li>" + esc(e) + "</li>").join("") + "</ul>" : "<p>Tidak ada.</p>"}
+            <h3>Peringatan (${r.warnings.length})</h3>
+            ${r.warnings.length ? "<ul>" + r.warnings.map(e => "<li>" + esc(e) + "</li>").join("") + "</ul>" : "<p>Tidak ada.</p>"}
+            <p class="pm-caption">Peringatan tidak menghalangi, tapi layak ditinjau. Pemeriksa ini hanya mengecek bentuk dan pola data, bukan apakah sebuah skenario benar-benar mengukur dimensinya. Itu tetap penilaianmu.</p>
+        `;
+    } catch (e) {
+        out.innerHTML = "<p style='color:#e53e3e'>Gagal membaca scenarios.js: " + esc(e.message) + "</p>";
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,321 @@
+/* mirror.css
+   Gaya Personality Mirror. Semua warna memakai variabel tema dari style.css,
+   jadi keempat tema (dan mode otomatis) ikut tanpa tambahan apa pun.
+   Kelas diawali "pm-" supaya tidak bentrok dengan halaman lain. */
+
+.pm-view[hidden],
+#pm-banner[hidden] { display: none; }
+
+/* Judul yang menerima fokus lewat skrip (tabindex -1) tidak perlu cincin fokus */
+.pm-view h2:focus,
+.pm-view h2:focus-visible { outline: none; }
+
+.pm-sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+
+.pm-tagline {
+    font-size: 17px;
+    font-style: italic;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+}
+
+.pm-note {
+    background: var(--surface-soft);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+    margin: 20px 0;
+}
+
+.pm-note h3 { margin: 0 0 8px; font-size: 16px; }
+.pm-note p:last-child { margin-bottom: 0; }
+
+.pm-testbanner {
+    margin-bottom: 20px;
+    padding: 12px 16px;
+    border: 1px dashed var(--accent);
+    border-radius: 12px;
+    background: var(--surface);
+    font-size: 14px;
+}
+
+/* ---- Tombol ---- */
+
+.pm-btn {
+    display: inline-block;
+    margin: 0;
+    padding: 12px 20px;
+    border: 1px solid var(--accent);
+    border-radius: 10px;
+    background: var(--accent);
+    color: var(--on-accent);
+    font-size: 15px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.pm-btn:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+
+.pm-btn-ghost {
+    background: transparent;
+    color: var(--text);
+    border-color: var(--border);
+}
+
+.pm-btn-ghost:hover { background: var(--surface-soft); border-color: var(--border); }
+
+.pm-btn:disabled,
+.pm-btn:disabled:hover {
+    opacity: 0.45;
+    cursor: not-allowed;
+    background: var(--surface-soft);
+    border-color: var(--border);
+    color: var(--text-muted);
+}
+
+.pm-btn:focus-visible,
+.pm-option:focus-within,
+.pm-input:focus-visible,
+.pm-details summary:focus-visible {
+    outline: 3px solid var(--accent-hover);
+    outline-offset: 2px;
+}
+
+.pm-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 22px;
+}
+
+/* ---- Skenario ---- */
+
+.pm-progress {
+    height: 8px;
+    border-radius: 999px;
+    background: var(--surface-soft);
+    border: 1px solid var(--border);
+    overflow: hidden;
+}
+
+.pm-progress-bar {
+    height: 100%;
+    background: var(--accent);
+    transition: width 0.3s ease;
+}
+
+.pm-count {
+    margin: 10px 0 18px;
+    font-size: 13px;
+    color: var(--text-light);
+    letter-spacing: 0.5px;
+}
+
+.pm-situation { font-size: 17px; line-height: 1.7; }
+
+.pm-options {
+    border: none;
+    padding: 0;
+    margin: 20px 0 8px;
+    min-width: 0;
+}
+
+.pm-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface-soft);
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.pm-option:hover { border-color: var(--accent); }
+
+.pm-option input {
+    margin-top: 4px;
+    flex-shrink: 0;
+    accent-color: var(--accent-hover);
+}
+
+.pm-option.selected {
+    border-color: var(--accent-hover);
+    background: var(--surface);
+    box-shadow: 0 0 0 1px var(--accent-hover);
+}
+
+.pm-hint { font-size: 13px; color: var(--text-light); margin-top: 6px; }
+
+.pm-nav { display: flex; justify-content: space-between; gap: 10px; margin-top: 20px; }
+
+/* ---- Hasil ---- */
+
+.pm-trait {
+    margin: 26px 0;
+    padding-bottom: 22px;
+    border-bottom: 1px solid var(--border);
+}
+
+.pm-trait:last-of-type { border-bottom: none; }
+
+.pm-trait-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+
+.pm-letter {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    background: var(--accent);
+    color: var(--on-accent);
+    flex-shrink: 0;
+}
+
+.pm-track {
+    position: relative;
+    height: 12px;
+    border-radius: 999px;
+    background: var(--surface-soft);
+    border: 1px solid var(--border);
+    margin: 22px 8px 8px;
+}
+
+.pm-track::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: -5px;
+    bottom: -5px;
+    width: 1px;
+    background: var(--border);
+}
+
+.pm-marker {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 24px;
+    height: 24px;
+    margin: -12px 0 0 -12px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 3px solid var(--surface);
+    box-shadow: 0 0 0 2px var(--accent-hover);
+    transition: left 0.9s cubic-bezier(.2, .8, .2, 1);
+}
+
+.pm-poles {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+}
+
+.pm-poles span:last-child { text-align: right; }
+
+.pm-band { font-weight: bold; margin-bottom: 8px; }
+
+.pm-vary {
+    font-size: 14px;
+    color: var(--text-muted);
+    padding: 10px 14px;
+    border-left: 3px solid var(--accent);
+    background: var(--surface-soft);
+    border-radius: 0 8px 8px 0;
+}
+
+.pm-tablewrap { overflow-x: auto; margin: 10px 0 6px; }
+
+.pm-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+
+.pm-table th,
+.pm-table td {
+    text-align: left;
+    padding: 10px 8px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+}
+
+.pm-table th { color: var(--text-muted); font-weight: 600; }
+
+.pm-caption { font-size: 13px; color: var(--text-light); }
+
+.pm-codebox {
+    display: block;
+    margin: 12px 0;
+    padding: 16px;
+    border: 1px dashed var(--accent-hover);
+    border-radius: 12px;
+    background: var(--surface-soft);
+    font-family: "Courier New", monospace;
+    font-size: 22px;
+    letter-spacing: 2px;
+    text-align: center;
+    word-break: break-all;
+    user-select: all;
+}
+
+.pm-warn { font-size: 14px; color: var(--text-muted); }
+
+/* ---- Edukasi & input ---- */
+
+.pm-details {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface-soft);
+    margin: 10px 0;
+    padding: 0 16px;
+}
+
+.pm-details summary { cursor: pointer; padding: 14px 0; font-weight: bold; }
+.pm-details[open] summary { border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+.pm-details div { padding-bottom: 6px; }
+
+.pm-input {
+    width: 100%;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface-soft);
+    color: var(--text);
+    font-family: "Courier New", monospace;
+    font-size: 20px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+}
+
+.pm-input::placeholder { color: var(--text-light); text-transform: none; }
+
+.pm-error { margin-top: 10px; color: #e53e3e; font-size: 14px; min-height: 20px; }
+
+[data-theme="dark"] .pm-error { color: #fc8181; }
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) .pm-error { color: #fc8181; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .pm-marker,
+    .pm-progress-bar,
+    .pm-option { transition: none; }
+}
+
+@media (max-width: 480px) {
+    .pm-codebox { font-size: 18px; letter-spacing: 1px; }
+    .pm-nav .pm-btn { flex: 1; }
+}
