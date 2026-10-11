@@ -288,6 +288,28 @@
 
         .comment-text { white-space: pre-wrap; overflow-wrap: anywhere; }
         .comment-name { overflow-wrap: anywhere; }
+
+        /* ---- DISCLAIMER (satu baris tipis, bisa dibuka) ---- */
+        .disclaimer { margin: 0 0 24px; border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 10px; background: var(--surface-soft); }
+        .disclaimer summary { display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer; font-size: 13px; list-style: none; }
+        .disclaimer summary::-webkit-details-marker { display: none; }
+        .disclaimer summary::after { content: "▾"; margin-left: auto; color: var(--text-light); transition: transform 0.2s; }
+        .disclaimer[open] summary::after { transform: rotate(180deg); }
+        .disclaimer summary strong { letter-spacing: 0.5px; }
+        .disclaimer-hint { color: var(--text-muted); }
+        .disclaimer summary:focus-visible { outline: 3px solid var(--accent-hover); outline-offset: 2px; border-radius: 8px; }
+        .disclaimer-body { padding: 4px 14px 8px; border-top: 1px solid var(--border); font-size: 14px; line-height: 1.7; color: var(--text-muted); }
+        .disclaimer-body p { margin: 12px 0; }
+
+        /* ---- LIKE ---- */
+        .like-bar { display: none; align-items: center; gap: 12px; margin: 16px 0 25px; flex-wrap: wrap; }
+        .like-btn { display: inline-flex; align-items: center; gap: 8px; margin: 0; padding: 10px 18px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text); font-size: 16px; font-family: inherit; cursor: pointer; transition: border-color 0.2s, background 0.2s; }
+        .like-btn:hover { background: var(--surface-soft); border-color: var(--accent-hover); }
+        .like-btn.liked { border-color: var(--accent-hover); background: var(--surface-soft); }
+        .like-btn.liked .like-heart { color: #e0526b; }
+        .like-heart { font-size: 20px; line-height: 1; }
+        .like-btn:focus-visible { outline: 3px solid var(--accent-hover); outline-offset: 2px; }
+        .like-msg { font-size: 13px; color: var(--text-muted); }
     </style>
 
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.4/dist/purify.min.js"></script>
@@ -317,6 +339,17 @@
             </p>
 
         </article>
+
+
+        <!-- LIKE -->
+
+        <div class="like-bar" id="like-bar">
+            <button type="button" class="like-btn" id="like-btn" aria-pressed="false">
+                <span class="like-heart" id="like-heart" aria-hidden="true">♡</span>
+                <span id="like-count">0</span>
+            </button>
+            <span class="like-msg" id="like-msg" role="status"></span>
+        </div>
 
 
         <!-- RELATED ARTICLES -->
@@ -364,6 +397,7 @@
 
         import { db, auth } from "../firebase-config.js";
         import { sanitizeRich, loadCustomFonts, applyContrastGuard } from "../rich-content.js";
+        import { DISCLAIMER } from "../disclaimer.js";
 
         import {
             doc,
@@ -376,6 +410,8 @@
             getDocs,
             addDoc,
             deleteDoc,
+            setDoc,
+            getCountFromServer,
             onSnapshot,
             serverTimestamp
         } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
@@ -594,12 +630,25 @@
                 const backHref = "all.html";
                 const backLabel = "All Writings";
 
+                // Peringatan: satu baris tipis, diketuk untuk membuka teks lengkapnya
+                const disclaimerHtml = `
+                    <details class="disclaimer">
+                        <summary>
+                            <span><strong>⚠️ ${esc(DISCLAIMER.title)}</strong> <span class="disclaimer-hint">· ${esc(DISCLAIMER.hint)}</span></span>
+                        </summary>
+                        <div class="disclaimer-body">
+                            ${DISCLAIMER.paragraphs.map(p => `<p>${esc(p)}</p>`).join("")}
+                        </div>
+                    </details>
+                `;
+
                 contentEl.innerHTML = `
                     ${isDraft ? '<p class="draft-banner">DRAFT · Pratinjau, belum terbit. Hanya kamu yang bisa melihat ini.</p>' : ""}
                     <p class="writing-category">${categoryLabel}</p>
                     <h2>${esc(data.title)}</h2>
                     ${metaHtml}
                     ${tagsHtml}
+                    ${disclaimerHtml}
                     ${photosHtml}
                     ${paragraphs}
                     ${referencesHtml}
@@ -612,7 +661,10 @@
                 applyContrastGuard(contentEl);
                 window.addEventListener("themechange", () => applyContrastGuard(contentEl));
 
-                if (!isDraft) loadRelated(snap.id, data);
+                if (!isDraft) {
+                    loadRelated(snap.id, data);
+                    initLikes(snap.id);
+                }
 
             } catch (error) {
                 if (error && error.code === "permission-denied") {
@@ -628,12 +680,111 @@
 
 
         // ==========================================
+        // LIKE (satu akun satu suka per tulisan)
+        // Dokumen: likes/{idTulisan}_{uid}. Jumlah dihitung langsung dari database.
+        // ==========================================
+
+        const likeBar = document.getElementById("like-bar");
+        const likeBtn = document.getElementById("like-btn");
+        const likeHeart = document.getElementById("like-heart");
+        const likeCount = document.getElementById("like-count");
+        const likeMsg = document.getElementById("like-msg");
+
+        const likeState = { id: null, count: 0, liked: false, busy: false };
+
+        function renderLike() {
+            likeCount.textContent = likeState.count;
+            likeHeart.textContent = likeState.liked ? "♥" : "♡";
+            likeBtn.classList.toggle("liked", likeState.liked);
+            likeBtn.setAttribute("aria-pressed", String(likeState.liked));
+            likeBtn.setAttribute(
+                "aria-label",
+                (likeState.liked ? "Batalkan suka. " : "Suka tulisan ini. ") + likeState.count + " suka"
+            );
+        }
+
+        async function refreshLikedState() {
+
+            if (!likeState.id) return;
+
+            if (!currentUser) {
+                likeState.liked = false;
+                renderLike();
+                return;
+            }
+
+            try {
+                const s = await getDoc(doc(db, "likes", `${likeState.id}_${currentUser.uid}`));
+                likeState.liked = s.exists();
+                renderLike();
+            } catch (e) { /* abaikan: tombol tetap bisa dipakai */ }
+        }
+
+        async function initLikes(articleId) {
+
+            likeState.id = articleId;
+
+            try {
+                const snap = await getCountFromServer(
+                    query(collection(db, "likes"), where("articleId", "==", articleId))
+                );
+                likeState.count = snap.data().count;
+                likeBar.style.display = "flex";
+                renderLike();
+                await refreshLikedState();
+            } catch (e) {
+                // Aturan Firestore belum dipasang atau gagal memuat: bagian suka disembunyikan
+            }
+        }
+
+        likeBtn.addEventListener("click", async () => {
+
+            if (!likeState.id || likeState.busy) return;
+
+            if (!currentUser) {
+                likeMsg.textContent = "Masuk dulu untuk menyukai tulisan ini.";
+                const trigger = document.querySelector(".auth-widget-trigger");
+                if (trigger) trigger.click();
+                return;
+            }
+
+            likeState.busy = true;
+            likeMsg.textContent = "";
+
+            const ref = doc(db, "likes", `${likeState.id}_${currentUser.uid}`);
+
+            try {
+                if (likeState.liked) {
+                    await deleteDoc(ref);
+                    likeState.liked = false;
+                    likeState.count = Math.max(0, likeState.count - 1);
+                } else {
+                    await setDoc(ref, {
+                        articleId: likeState.id,
+                        userId: currentUser.uid,
+                        createdAt: serverTimestamp()
+                    });
+                    likeState.liked = true;
+                    likeState.count += 1;
+                }
+                renderLike();
+            } catch (e) {
+                likeMsg.textContent = "Gagal menyimpan suka. Coba lagi nanti.";
+            } finally {
+                likeState.busy = false;
+            }
+        });
+
+
+        // ==========================================
         // COMMENTS LOGIC
         // ==========================================
 
         onAuthStateChanged(auth, (user) => {
 
             currentUser = user;
+
+            refreshLikedState();
 
             if (user) {
                 loginPrompt.style.display = "none";

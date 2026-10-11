@@ -1308,7 +1308,7 @@
 
             if (!confirm(`Hapus ${src === "drafts" ? "draft" : "tulisan"} "${title}"? Ini permanen dan tidak bisa dibatalkan.`)) return;
 
-            if (src === "writings" && !confirm("Komentar pada tulisan ini juga akan ikut terhapus. Lanjutkan?")) return;
+            if (src === "writings" && !confirm("Komentar dan suka pada tulisan ini juga akan ikut terhapus. Lanjutkan?")) return;
 
             try {
 
@@ -1316,6 +1316,10 @@
                     // Komentar dihapus dulu, baru tulisannya
                     const cs = await getDocs(query(collection(db, "comments"), where("articleId", "==", id)));
                     for (const d of cs.docs) {
+                        await deleteDoc(d.ref);
+                    }
+                    const ls = await getDocs(query(collection(db, "likes"), where("articleId", "==", id)));
+                    for (const d of ls.docs) {
                         await deleteDoc(d.ref);
                     }
                     await deleteDoc(doc(db, "writings", id));
