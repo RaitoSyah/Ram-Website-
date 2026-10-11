@@ -6,7 +6,7 @@
 // (sesuaikan PATH relatif ke lokasi firebase-config.js)
 // ========================================
 
-import { auth } from "./firebase-config.js";
+import { auth, db } from "./firebase-config.js";
 
 import {
     GoogleAuthProvider,
@@ -14,6 +14,14 @@ import {
     signOut,
     onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+
+import {
+    collection,
+    query,
+    orderBy,
+    limit,
+    getDocs
+} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 
 const ADMIN_EMAIL = "im.raito.id@gmail.com";
@@ -25,6 +33,83 @@ const ACCOUNT_URL = new URL("account.html", import.meta.url).href;
 const esc = (t) => String(t ?? "").replace(/[&<>"']/g, c => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
 }[c]));
+
+
+// ---- NOTIFIKASI TULISAN BARU (di dalam website) ----
+// Saat pengunjung membuka website dan ada tulisan yang terbit setelah terakhir
+// kali dia lihat, muncul titik merah di ikon profil dan kotak info di panel.
+// Tidak butuh server. Hanya jalan kalau website sedang dibuka.
+
+const ARTICLE_URL = new URL("writings/article.html", import.meta.url).href;
+
+let latest = null; // { id, title, ms } tulisan terbaru yang sudah terbit
+
+function notifOn() {
+    try { return localStorage.getItem("notif") === "on"; } catch (e) { return false; }
+}
+
+function setNotifOn(on) {
+    try {
+        if (on) localStorage.setItem("notif", "on");
+        else localStorage.removeItem("notif");
+    } catch (e) { /* penyimpanan diblokir */ }
+}
+
+function getSeen() {
+    try { return Number(localStorage.getItem("notifSeen") || 0); } catch (e) { return 0; }
+}
+
+function setSeen(ms) {
+    try { localStorage.setItem("notifSeen", String(ms)); } catch (e) { /* abaikan */ }
+}
+
+function hasNew() {
+    return notifOn() && latest && latest.ms > getSeen();
+}
+
+// Satu pengambilan data per 10 menit per tab, supaya tidak boros pembacaan database
+async function loadLatest(force) {
+
+    if (!force) {
+        try {
+            const cached = JSON.parse(sessionStorage.getItem("notifLatest") || "null");
+            if (cached && Date.now() - cached.at < 10 * 60 * 1000) {
+                latest = cached.data;
+                return;
+            }
+        } catch (e) { /* lanjut ambil baru */ }
+    }
+
+    try {
+        const snap = await getDocs(query(collection(db, "writings"), orderBy("createdAt", "desc"), limit(1)));
+
+        if (snap.empty) {
+            latest = null;
+        } else {
+            const d = snap.docs[0];
+            const data = d.data();
+            latest = {
+                id: d.id,
+                title: data.title || "Tulisan baru",
+                ms: data.createdAt && data.createdAt.toMillis ? data.createdAt.toMillis() : 0
+            };
+        }
+
+        try { sessionStorage.setItem("notifLatest", JSON.stringify({ at: Date.now(), data: latest })); } catch (e) { /* abaikan */ }
+
+    } catch (e) {
+        latest = null; // gagal mengambil: notifikasi diam saja, website tetap normal
+    }
+}
+
+// Kalau pengunjung sedang membuka tulisan terbaru itu, anggap sudah dibaca
+function markSeenIfReading() {
+    if (!latest) return;
+    const params = new URLSearchParams(location.search);
+    if (location.pathname.endsWith("article.html") && params.get("id") === latest.id) {
+        setSeen(latest.ms);
+    }
+}
 
 
 // ---- TEMA ----
@@ -55,6 +140,43 @@ function applyTheme(id) {
 
 // Dipasang sedini mungkin (potongan kecil di <head> tiap halaman menghindari kedipan)
 applyTheme(getStoredTheme());
+
+function renderNotifArea() {
+
+    const area = document.getElementById("auth-widget-notif");
+    const dot = document.getElementById("auth-widget-dot");
+
+    const showNew = hasNew();
+    if (dot) dot.style.display = showNew ? "block" : "none";
+
+    if (!area) return;
+
+    const on = notifOn();
+
+    let html = "";
+
+    if (showNew) {
+        html += `
+            <div class="auth-widget-notice">
+                <strong>Tulisan baru</strong>
+                <p>${esc(latest.title)}</p>
+                <a href="${ARTICLE_URL}?id=${encodeURIComponent(latest.id)}" data-notif-read>Baca sekarang →</a>
+                <button type="button" class="auth-widget-mini" data-notif-dismiss>Tandai dibaca</button>
+            </div>
+        `;
+    }
+
+    html += `
+        <div class="auth-widget-section-label">Notifikasi</div>
+        <div class="auth-widget-switch-row">
+            <span>Beri tahu tulisan baru</span>
+            <button type="button" class="auth-widget-switch ${on ? "on" : ""}" role="switch" aria-checked="${on}" aria-label="Notifikasi tulisan baru" data-notif-toggle><span></span></button>
+        </div>
+        <p class="auth-widget-hint">Penanda muncul saat kamu membuka website dan ada tulisan baru sejak kunjungan terakhirmu.</p>
+    `;
+
+    area.innerHTML = html;
+}
 
 function renderThemePicker() {
     return `
@@ -378,6 +500,113 @@ style.textContent = `
         flex-shrink: 0;
     }
 
+    .auth-widget-switch-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-top: 12px;
+        font-size: 14px;
+        color: var(--text, #333);
+    }
+
+    .auth-widget-switch {
+        position: relative;
+        width: 44px;
+        height: 24px;
+        flex-shrink: 0;
+        margin: 0;
+        padding: 0;
+        border-radius: 999px;
+        border: 1px solid var(--border, #ddd);
+        background: var(--surface-soft, #f7f7f7);
+        cursor: pointer;
+    }
+
+    .auth-widget-switch span {
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: var(--text-light, #888);
+        transition: left 0.2s;
+    }
+
+    .auth-widget-switch.on {
+        background: var(--accent, #5b9bd5);
+        border-color: var(--accent, #5b9bd5);
+    }
+
+    .auth-widget-switch.on span {
+        left: 22px;
+        background: var(--on-accent, #fff);
+    }
+
+    .auth-widget-hint {
+        font-size: 12px;
+        color: var(--text-light, #888);
+        margin-top: 8px;
+        line-height: 1.5;
+    }
+
+    .auth-widget-notice {
+        margin-top: 20px;
+        padding: 12px;
+        border: 1px solid var(--accent, #5b9bd5);
+        border-radius: 10px;
+        background: var(--surface-soft, #f7f7f7);
+        font-size: 14px;
+        color: var(--text, #333);
+    }
+
+    .auth-widget-notice p {
+        margin: 4px 0 8px;
+    }
+
+    .auth-widget-notice a {
+        color: var(--accent-hover, #5b9bd5);
+        font-weight: bold;
+        margin-right: 8px;
+    }
+
+    .auth-widget-mini {
+        margin: 0;
+        padding: 4px 10px;
+        border-radius: 8px;
+        border: 1px solid var(--border, #ddd);
+        background: transparent;
+        color: var(--text-light, #888);
+        font-size: 12px;
+        cursor: pointer;
+    }
+
+    #auth-widget-dot {
+        display: none;
+        position: fixed;
+        top: 12px;
+        right: 12px;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #e53e3e;
+        border: 2px solid var(--bg, #fff);
+        z-index: 999;
+        pointer-events: none;
+    }
+
+    /* style.css punya aturan button:hover global (latar aksen). Di panel ini dinetralkan,
+       supaya tombol tidak tetap berwarna aksen setelah diketuk di layar sentuh. */
+    .auth-widget-trigger:hover { background: var(--surface-soft, #f0f0f0); }
+    .auth-widget-close:hover { background: none; }
+    .auth-widget-btn:hover { background: var(--surface-soft, #f7f7f7); }
+    .auth-widget-btn.primary:hover { background: var(--accent-hover, #5b9bd5); }
+    .auth-widget-theme-btn:hover { background: var(--surface-soft, #f7f7f7); }
+    .auth-widget-switch:hover { background: var(--surface-soft, #f7f7f7); }
+    .auth-widget-switch.on:hover { background: var(--accent, #5b9bd5); }
+    .auth-widget-mini:hover { background: transparent; }
+
 `;
 document.head.appendChild(style);
 
@@ -393,6 +622,10 @@ trigger.innerHTML = `
     </svg>
 `;
 document.body.appendChild(trigger);
+
+const dot = document.createElement("span");
+dot.id = "auth-widget-dot";
+document.body.appendChild(dot);
 
 const overlay = document.createElement("div");
 overlay.className = "auth-widget-overlay";
@@ -434,6 +667,7 @@ function renderLoggedOut() {
         <button class="auth-widget-btn primary" id="auth-widget-login-btn">
             Sign in with Google
         </button>
+        <div id="auth-widget-notif"></div>
         ${renderThemePicker()}
         ${renderSocialLinks()}
     `;
@@ -470,6 +704,7 @@ function renderLoggedIn(user) {
             Logout
         </button>
 
+        <div id="auth-widget-notif"></div>
         ${renderThemePicker()}
         ${renderSocialLinks()}
     `;
@@ -479,10 +714,48 @@ function renderLoggedIn(user) {
 }
 
 
-contentEl.addEventListener("click", (e) => {
-    const btn = e.target.closest("[data-theme-choice]");
-    if (btn) chooseTheme(btn.dataset.themeChoice);
+contentEl.addEventListener("click", async (e) => {
+
+    const themeBtn = e.target.closest("[data-theme-choice]");
+    if (themeBtn) {
+        chooseTheme(themeBtn.dataset.themeChoice);
+        return;
+    }
+
+    // Saklar notifikasi
+    if (e.target.closest("[data-notif-toggle]")) {
+        if (notifOn()) {
+            setNotifOn(false);
+        } else {
+            setNotifOn(true);
+            await loadLatest(true);
+            // Mulai dari sekarang: hanya tulisan BERIKUTNYA yang diberi tahu
+            setSeen(latest ? latest.ms : Date.now());
+        }
+        renderNotifArea();
+        return;
+    }
+
+    // "Baca sekarang": tandai dibaca lalu biarkan tautannya jalan
+    if (e.target.closest("[data-notif-read]")) {
+        if (latest) setSeen(latest.ms);
+        return;
+    }
+
+    if (e.target.closest("[data-notif-dismiss]")) {
+        if (latest) setSeen(latest.ms);
+        renderNotifArea();
+    }
 });
+
+async function initNotif() {
+    if (!notifOn()) return;
+    await loadLatest(false);
+    markSeenIfReading();
+    renderNotifArea();
+}
+
+initNotif();
 
 onAuthStateChanged(auth, (user) => {
     if (user) {
@@ -491,4 +764,5 @@ onAuthStateChanged(auth, (user) => {
         renderLoggedOut();
     }
     markActiveTheme();
+    renderNotifArea();
 });

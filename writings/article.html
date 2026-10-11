@@ -2,7 +2,6 @@
 <html lang="id">
 
 <head>
-    <script>/*theme-init*/(function(){try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark"||t==="warm"||t==="mono")document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
 
     <meta charset="UTF-8">
 
@@ -286,6 +285,9 @@
         .related-meta { font-size: 13px; color: var(--text-light); margin: 0 0 8px; }
 
         .draft-banner { padding: 10px 14px; border: 1px dashed var(--accent); border-radius: 8px; font-size: 13px; margin: 0 0 20px; }
+
+        .comment-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+        .comment-name { overflow-wrap: anywhere; }
     </style>
 
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.4/dist/purify.min.js"></script>
@@ -338,7 +340,7 @@
             </p>
 
             <div class="comment-form" id="comment-form">
-                <textarea id="comment-input" placeholder="Tulis komentar..."></textarea>
+                <textarea id="comment-input" maxlength="1000" placeholder="Tulis komentar..."></textarea>
                 <button id="comment-submit-btn">Kirim Komentar</button>
             </div>
 
@@ -616,7 +618,7 @@
                 if (error && error.code === "permission-denied") {
                     contentEl.innerHTML = `<p>Tulisan tidak ditemukan.</p>`;
                 } else {
-                    contentEl.innerHTML = `<p style="color:#e53e3e;">Gagal memuat tulisan: ${error.message}</p>`;
+                    contentEl.innerHTML = `<p style="color:#e53e3e;">Gagal memuat tulisan: ${escHtml(error.message)}</p>`;
                 }
             }
 
@@ -644,6 +646,18 @@
 
         });
 
+
+        // Teks dari luar (pesan error, dll) tidak boleh masuk ke HTML mentah
+        function escHtml(t) {
+            return String(t ?? "").replace(/[&<>"']/g, c => ({
+                "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+            }[c]));
+        }
+
+        // Foto profil kosong/tidak valid diganti lingkaran abu-abu
+        const AVATAR_FALLBACK = "data:image/svg+xml," + encodeURIComponent(
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><circle cx="20" cy="20" r="20" fill="#9aa4b0"/></svg>'
+        );
 
         function renderComments(snapshot) {
 
@@ -673,29 +687,53 @@
                 const item = document.createElement("div");
                 item.className = "comment-item";
 
-                item.innerHTML = `
-                    <img src="${c.userPhoto || ''}" alt="${c.userName}">
-                    <div class="comment-body">
-                        <p class="comment-name">${c.userName}</p>
-                        <p class="comment-text">${c.text}</p>
-                        <div class="comment-meta">
-                            <span>${date}</span>
-                            ${isAdmin ? `<button class="comment-delete-btn" data-id="${docSnap.id}">Hapus</button>` : ""}
-                        </div>
-                    </div>
-                `;
+                // Semua teks komentar dimasukkan sebagai TEKS, jadi kode di dalamnya tidak pernah dijalankan
+                const img = document.createElement("img");
+                const photo = String(c.userPhoto || "");
+                img.src = /^https:\/\//i.test(photo) ? photo : AVATAR_FALLBACK;
+                img.alt = String(c.userName || "");
+                img.referrerPolicy = "no-referrer";
+
+                const body = document.createElement("div");
+                body.className = "comment-body";
+
+                const nameEl = document.createElement("p");
+                nameEl.className = "comment-name";
+                nameEl.textContent = String(c.userName || "");
+
+                const textEl = document.createElement("p");
+                textEl.className = "comment-text";
+                textEl.textContent = String(c.text || "");
+
+                const meta = document.createElement("div");
+                meta.className = "comment-meta";
+
+                const dateEl = document.createElement("span");
+                dateEl.textContent = date;
+                meta.appendChild(dateEl);
+
+                // Tombol hapus hanya dibuat untuk admin
+                if (isAdmin) {
+                    const delBtn = document.createElement("button");
+                    delBtn.className = "comment-delete-btn";
+                    delBtn.textContent = "Hapus";
+                    delBtn.addEventListener("click", async () => {
+                        if (confirm("Hapus komentar ini?")) {
+                            await deleteDoc(doc(db, "comments", docSnap.id));
+                        }
+                    });
+                    meta.appendChild(delBtn);
+                }
+
+                body.appendChild(nameEl);
+                body.appendChild(textEl);
+                body.appendChild(meta);
+
+                item.appendChild(img);
+                item.appendChild(body);
 
                 commentListEl.appendChild(item);
 
-            });
-
-            // pasang listener hapus (cuma admin yang punya tombolnya)
-            commentListEl.querySelectorAll(".comment-delete-btn").forEach(btn => {
-                btn.addEventListener("click", async () => {
-                    if (confirm("Hapus komentar ini?")) {
-                        await deleteDoc(doc(db, "comments", btn.dataset.id));
-                    }
-                });
             });
 
         }
@@ -712,7 +750,7 @@
             onSnapshot(commentsQuery, renderComments, (error) => {
                 commentListEl.innerHTML = `
                     <p style="color:#e53e3e; font-size:14px;">
-                        Gagal memuat komentar: ${error.message}
+                        Gagal memuat komentar: ${escHtml(error.message)}
                     </p>
                 `;
             });
@@ -732,9 +770,10 @@
 
                 await addDoc(collection(db, "comments"), {
                     articleId: articleId,
-                    text: text,
+                    text: text.slice(0, 1000),
                     userName: currentUser.displayName || currentUser.email,
                     userPhoto: currentUser.photoURL || "",
+                    userId: currentUser.uid,
                     createdAt: serverTimestamp()
                 });
 
