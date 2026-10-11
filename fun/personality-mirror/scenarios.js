@@ -25,7 +25,7 @@ export const SCENARIOS_VERSION = 1;
 
 export const IS_PLACEHOLDER = false;
 
-export const scenarios = [
+export const SCENARIOS = [
     // ==========================================
     // O — OPENNESS TO EXPERIENCE
     // ==========================================
