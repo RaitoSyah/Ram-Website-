@@ -23,7 +23,7 @@
 
 export const SCENARIOS_VERSION = 1;
 
-export const IS_PLACEHOLDER = true;
+export const IS_PLACEHOLDER = false;
 
 export const scenarios = [
     // ==========================================
@@ -800,5 +800,3 @@ export const scenarios = [
         ]
     }
 ];
-
-export default scenarios;
