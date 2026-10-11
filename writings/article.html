@@ -301,15 +301,28 @@
         .disclaimer-body { padding: 4px 14px 8px; border-top: 1px solid var(--border); font-size: 14px; line-height: 1.7; color: var(--text-muted); }
         .disclaimer-body p { margin: 12px 0; }
 
-        /* ---- LIKE ---- */
-        .like-bar { display: none; align-items: center; gap: 12px; margin: 16px 0 25px; flex-wrap: wrap; }
-        .like-btn { display: inline-flex; align-items: center; gap: 8px; margin: 0; padding: 10px 18px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text); font-size: 16px; font-family: inherit; cursor: pointer; transition: border-color 0.2s, background 0.2s; }
-        .like-btn:hover { background: var(--surface-soft); border-color: var(--accent-hover); }
-        .like-btn.liked { border-color: var(--accent-hover); background: var(--surface-soft); }
-        .like-btn.liked .like-heart { color: #e0526b; }
-        .like-heart { font-size: 20px; line-height: 1; }
-        .like-btn:focus-visible { outline: 3px solid var(--accent-hover); outline-offset: 2px; }
-        .like-msg { font-size: 13px; color: var(--text-muted); }
+        /* ---- BAR AKSI: suka, bagikan, simpan ---- */
+        .action-bar { display: none; flex-wrap: wrap; gap: 10px; margin: 16px 0 25px; padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 18px; }
+        .act { position: relative; flex: 1 1 0; min-width: 88px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; margin: 0; padding: 12px 6px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface-soft); color: var(--text); font-size: 13px; font-family: inherit; font-weight: 600; cursor: pointer; transition: border-color 0.2s, background 0.2s, transform 0.1s; }
+        .act:hover { background: var(--surface-soft); border-color: var(--accent-hover); }
+        .act:active { transform: scale(0.97); }
+        .act:focus-visible { outline: 3px solid var(--accent-hover); outline-offset: 2px; }
+        .act svg { width: 20px; height: 20px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: fill 0.2s, stroke 0.2s; }
+        .act-like.liked { border-color: #e0526b; }
+        .act-like.liked svg { fill: #e0526b; stroke: #e0526b; }
+        .act-save.saved { border-color: var(--accent-hover); }
+        .act-save.saved svg { fill: var(--accent-hover); stroke: var(--accent-hover); }
+        .act.pop svg { animation: actPop 0.45s cubic-bezier(.2, 1.6, .4, 1); }
+        .burst { position: absolute; left: 21px; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: #e0526b; pointer-events: none; animation: burstOut 0.6s ease-out forwards; }
+        .act-msg { flex: 1 0 100%; min-height: 0; margin: 0; font-size: 13px; color: var(--text-muted); text-align: center; }
+        .act-msg:empty { display: none; }
+        .act-msg a { color: var(--accent-hover); font-weight: bold; }
+        @keyframes actPop { 0% { transform: scale(1); } 40% { transform: scale(1.4); } 100% { transform: scale(1); } }
+        @keyframes burstOut { 0% { transform: translate(0, 0) scale(1); opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) scale(0.3); opacity: 0; } }
+        @media (prefers-reduced-motion: reduce) {
+            .act, .act svg { transition: none; }
+            .act.pop svg, .burst { animation: none; }
+        }
     </style>
 
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.4/dist/purify.min.js"></script>
@@ -343,12 +356,25 @@
 
         <!-- LIKE -->
 
-        <div class="like-bar" id="like-bar">
-            <button type="button" class="like-btn" id="like-btn" aria-pressed="false">
-                <span class="like-heart" id="like-heart" aria-hidden="true">♡</span>
+        <div class="action-bar" id="action-bar">
+
+            <button type="button" class="act act-like" id="like-btn" aria-pressed="false" style="display:none;">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
                 <span id="like-count">0</span>
             </button>
-            <span class="like-msg" id="like-msg" role="status"></span>
+
+            <button type="button" class="act act-share" id="share-btn">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                <span>Bagikan</span>
+            </button>
+
+            <button type="button" class="act act-save" id="save-btn" aria-pressed="false">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+                <span id="save-label">Simpan</span>
+            </button>
+
+            <p class="act-msg" id="act-msg" role="status"></p>
+
         </div>
 
 
@@ -663,7 +689,7 @@
 
                 if (!isDraft) {
                     loadRelated(snap.id, data);
-                    initLikes(snap.id);
+                    initActions(snap.id, data.title);
                 }
 
             } catch (error) {
@@ -680,21 +706,60 @@
 
 
         // ==========================================
-        // LIKE (satu akun satu suka per tulisan)
-        // Dokumen: likes/{idTulisan}_{uid}. Jumlah dihitung langsung dari database.
+        // BAR AKSI: SUKA, BAGIKAN, SIMPAN
+        // Suka   : likes/{idTulisan}_{uid} di Firestore (perlu login)
+        // Bagikan: lembar bagikan bawaan HP, atau salin tautan
+        // Simpan : disimpan di browser ini (localStorage), dilihat di saved.html
         // ==========================================
 
-        const likeBar = document.getElementById("like-bar");
+        const actionBar = document.getElementById("action-bar");
         const likeBtn = document.getElementById("like-btn");
-        const likeHeart = document.getElementById("like-heart");
         const likeCount = document.getElementById("like-count");
-        const likeMsg = document.getElementById("like-msg");
+        const shareBtn = document.getElementById("share-btn");
+        const saveBtn = document.getElementById("save-btn");
+        const saveLabel = document.getElementById("save-label");
+        const actMsg = document.getElementById("act-msg");
 
         const likeState = { id: null, count: 0, liked: false, busy: false };
+        let actionTitle = "";
+
+        const SAVE_KEY = "savedArticles";
+
+        function setMsg(text, href, linkText) {
+            actMsg.textContent = text || "";
+            if (href) {
+                actMsg.appendChild(document.createTextNode(" "));
+                const a = document.createElement("a");
+                a.href = href;
+                a.textContent = linkText;
+                actMsg.appendChild(a);
+            }
+        }
+
+        function popIcon(btn) {
+            btn.classList.remove("pop");
+            void btn.offsetWidth; // mulai ulang animasi
+            btn.classList.add("pop");
+        }
+
+        function burst(btn) {
+            if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+            const n = 7;
+            for (let i = 0; i < n; i++) {
+                const p = document.createElement("i");
+                p.className = "burst";
+                const ang = (Math.PI * 2 * i) / n;
+                p.style.setProperty("--dx", Math.cos(ang) * 30 + "px");
+                p.style.setProperty("--dy", Math.sin(ang) * 30 + "px");
+                btn.appendChild(p);
+                setTimeout(() => p.remove(), 650);
+            }
+        }
+
+        // ---------- SUKA ----------
 
         function renderLike() {
             likeCount.textContent = likeState.count;
-            likeHeart.textContent = likeState.liked ? "♥" : "♡";
             likeBtn.classList.toggle("liked", likeState.liked);
             likeBtn.setAttribute("aria-pressed", String(likeState.liked));
             likeBtn.setAttribute(
@@ -729,11 +794,12 @@
                     query(collection(db, "likes"), where("articleId", "==", articleId))
                 );
                 likeState.count = snap.data().count;
-                likeBar.style.display = "flex";
+                likeBtn.style.display = "";
                 renderLike();
                 await refreshLikedState();
             } catch (e) {
-                // Aturan Firestore belum dipasang atau gagal memuat: bagian suka disembunyikan
+                // Aturan Firestore belum dipasang atau gagal memuat: tombol suka disembunyikan,
+                // bagikan dan simpan tetap berfungsi
             }
         }
 
@@ -742,14 +808,14 @@
             if (!likeState.id || likeState.busy) return;
 
             if (!currentUser) {
-                likeMsg.textContent = "Masuk dulu untuk menyukai tulisan ini.";
+                setMsg("Masuk dulu untuk menyukai tulisan ini.");
                 const trigger = document.querySelector(".auth-widget-trigger");
                 if (trigger) trigger.click();
                 return;
             }
 
             likeState.busy = true;
-            likeMsg.textContent = "";
+            setMsg("");
 
             const ref = doc(db, "likes", `${likeState.id}_${currentUser.uid}`);
 
@@ -766,14 +832,133 @@
                     });
                     likeState.liked = true;
                     likeState.count += 1;
+                    popIcon(likeBtn);
+                    burst(likeBtn);
                 }
                 renderLike();
             } catch (e) {
-                likeMsg.textContent = "Gagal menyimpan suka. Coba lagi nanti.";
+                setMsg("Gagal menyimpan suka. Coba lagi nanti.");
             } finally {
                 likeState.busy = false;
             }
         });
+
+        // ---------- BAGIKAN ----------
+
+        // Tautan yang selalu langsung menuju tulisan ini (tanpa parameter lain)
+        function shareUrl() {
+            const u = new URL(location.href);
+            u.search = "?id=" + encodeURIComponent(likeState.id);
+            u.hash = "";
+            return u.href;
+        }
+
+        async function copyText(text) {
+            try {
+                await navigator.clipboard.writeText(text);
+                return true;
+            } catch (e) {
+                try {
+                    const ta = document.createElement("textarea");
+                    ta.value = text;
+                    ta.setAttribute("readonly", "");
+                    ta.style.position = "fixed";
+                    ta.style.opacity = "0";
+                    document.body.appendChild(ta);
+                    ta.select();
+                    const ok = document.execCommand("copy");
+                    ta.remove();
+                    return ok;
+                } catch (e2) {
+                    return false;
+                }
+            }
+        }
+
+        shareBtn.addEventListener("click", async () => {
+
+            if (!likeState.id) return;
+
+            const url = shareUrl();
+
+            // HP: lembar bagikan bawaan (WhatsApp, dan lainnya)
+            if (navigator.share) {
+                try {
+                    await navigator.share({ title: actionTitle, text: actionTitle, url });
+                    return;
+                } catch (e) {
+                    if (e && e.name === "AbortError") return; // dibatalkan pengguna
+                }
+            }
+
+            // Cadangan: salin tautan
+            const ok = await copyText(url);
+            setMsg(ok ? "Tautan disalin." : "Tidak bisa menyalin otomatis. Salin dari kolom alamat browser.");
+            setTimeout(() => setMsg(""), 4000);
+        });
+
+        // ---------- SIMPAN ----------
+
+        function readSaved() {
+            try {
+                const arr = JSON.parse(localStorage.getItem(SAVE_KEY) || "[]");
+                return Array.isArray(arr) ? arr.filter(x => x && typeof x.id === "string") : [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function writeSaved(list) {
+            try {
+                localStorage.setItem(SAVE_KEY, JSON.stringify(list.slice(0, 200)));
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        function renderSave() {
+            const saved = readSaved().some(x => x.id === likeState.id);
+            saveBtn.classList.toggle("saved", saved);
+            saveBtn.setAttribute("aria-pressed", String(saved));
+            saveLabel.textContent = saved ? "Tersimpan" : "Simpan";
+        }
+
+        saveBtn.addEventListener("click", () => {
+
+            if (!likeState.id) return;
+
+            let list = readSaved();
+            const already = list.some(x => x.id === likeState.id);
+
+            if (already) {
+                list = list.filter(x => x.id !== likeState.id);
+            } else {
+                list.unshift({ id: likeState.id, at: Date.now() });
+            }
+
+            if (!writeSaved(list)) {
+                setMsg("Browser memblokir penyimpanan, jadi tulisan ini tidak bisa disimpan.");
+                return;
+            }
+
+            renderSave();
+
+            if (already) {
+                setMsg("Dihapus dari simpanan.");
+            } else {
+                popIcon(saveBtn);
+                setMsg("Disimpan di browser ini.", "saved.html", "Lihat tersimpan");
+            }
+        });
+
+        function initActions(articleId, title) {
+            likeState.id = articleId;
+            actionTitle = title || document.title;
+            actionBar.style.display = "flex";
+            renderSave();
+            initLikes(articleId);
+        }
 
 
         // ==========================================
