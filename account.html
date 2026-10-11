@@ -2,7 +2,6 @@
 <html lang="id">
 
 <head>
-    <script>/*theme-init*/(function(){try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark"||t==="warm"||t==="mono")document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
 
     <meta charset="UTF-8">
 
@@ -212,6 +211,7 @@
         .ql-snow .ql-tooltip input[type=text] { background:var(--surface-soft); color:var(--text); border-color:var(--border); }
         .ql-snow .ql-tooltip a.ql-action::after, .ql-snow .ql-tooltip a.ql-remove::before { color:var(--accent-hover); }
         .ql-tooltip input[type=text] { width:170px; padding:3px 5px; border-radius:0; }
+        #delete-writing-btn { border-color:#e53e3e !important; color:#e53e3e !important; }
     </style>
 
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css">
@@ -281,11 +281,23 @@
                 <p id="writing-list-info" style="font-size:13px; opacity:.7; margin:8px 0 0;"></p>
                 <button type="button" id="drafts-toggle" style="display:none; margin:8px 0; padding:6px 12px; border:1px solid var(--border, #ccc); border-radius:8px; background:transparent; color:inherit; cursor:pointer; font-family:inherit;"></button>
                 <div id="writing-list"><p style="font-size:14px; opacity:.7;">Memuat...</p></div>
+                <details style="margin-top:12px; font-size:14px;">
+                    <summary style="cursor:pointer;">Rapikan tulisan lama</summary>
+                    <p style="font-size:13px; opacity:.8; margin:8px 0;">
+                        Tulisan lama yang belum punya tags diberi satu tag dari kategorinya.
+                        Kategori lama tidak dihapus. Aman dijalankan berulang kali.
+                    </p>
+                    <button type="button" id="migrate-tags-btn" style="margin:0; padding:6px 12px; border:1px solid var(--border, #ccc); border-radius:8px; background:transparent; color:inherit; cursor:pointer; font-family:inherit;">
+                        Jadikan kategori lama sebagai tags
+                    </button>
+                    <p id="migrate-status" style="font-size:13px; margin:8px 0 0;"></p>
+                </details>
             </div>
 
             <div id="edit-banner">
                 Mengedit: <strong id="edit-title"></strong>
                 <button type="button" id="cancel-edit-btn">Batal edit</button>
+                <button type="button" id="delete-writing-btn">Hapus</button>
             </div>
 
             <div class="admin-field">
@@ -1045,6 +1057,7 @@
         let draftsOnly = false;
 
         function updateButtons() {
+            document.getElementById("delete-writing-btn").style.display = editingId ? "" : "none";
             const pubBtn = document.getElementById("submit-writing-btn");
             const draftBtn = document.getElementById("save-draft-btn");
             if (editingSource === "writings") {
@@ -1280,6 +1293,85 @@
         });
 
         document.getElementById("cancel-edit-btn").addEventListener("click", cancelEdit);
+
+
+        // ---- HAPUS TULISAN / DRAFT ----
+
+        document.getElementById("delete-writing-btn").addEventListener("click", async () => {
+
+            if (!editingId) return;
+
+            const id = editingId;
+            const src = editingSource;
+            const data = writingMap.get(id) || {};
+            const title = data.title || "(tanpa judul)";
+
+            if (!confirm(`Hapus ${src === "drafts" ? "draft" : "tulisan"} "${title}"? Ini permanen dan tidak bisa dibatalkan.`)) return;
+
+            if (src === "writings" && !confirm("Komentar pada tulisan ini juga akan ikut terhapus. Lanjutkan?")) return;
+
+            try {
+
+                if (src === "writings") {
+                    // Komentar dihapus dulu, baru tulisannya
+                    const cs = await getDocs(query(collection(db, "comments"), where("articleId", "==", id)));
+                    for (const d of cs.docs) {
+                        await deleteDoc(d.ref);
+                    }
+                    await deleteDoc(doc(db, "writings", id));
+                } else {
+                    await deleteDoc(doc(db, "drafts", id));
+                }
+
+                cancelEdit();
+                writingStatus.textContent = `"${title}" sudah dihapus.`;
+                writingStatus.className = "admin-status success";
+                document.getElementById("writing-search").value = "";
+                draftsOnly = false;
+                loadWritingList();
+                loadTagSuggestions();
+
+            } catch (error) {
+                writingStatus.textContent = "Gagal menghapus: " + error.message;
+                writingStatus.className = "admin-status error";
+            }
+        });
+
+
+        // ---- RAPIKAN TULISAN LAMA: kategori -> tags ----
+
+        document.getElementById("migrate-tags-btn").addEventListener("click", async () => {
+
+            const statusEl = document.getElementById("migrate-status");
+
+            if (!confirm("Tulisan lama yang belum punya tags akan diberi tag dari kategorinya. Kategori lama tidak dihapus. Lanjutkan?")) return;
+
+            statusEl.textContent = "Memproses...";
+
+            try {
+                const snap = await getDocs(collection(db, "writings"));
+                let n = 0;
+
+                for (const d of snap.docs) {
+                    const x = d.data();
+                    const hasTags = Array.isArray(x.tags) && x.tags.length;
+                    if (!hasTags && x.category) {
+                        await updateDoc(d.ref, { tags: [String(x.category).toLowerCase()] });
+                        n++;
+                    }
+                }
+
+                statusEl.textContent = n
+                    ? `${n} tulisan diberi tags.`
+                    : "Tidak ada yang perlu dirapikan.";
+
+                loadWritingList();
+                loadTagSuggestions();
+
+            } catch (error) {
+                statusEl.textContent = "Gagal: " + error.message;
+            }
+        });
 
 
         // ---- TAGS ----
