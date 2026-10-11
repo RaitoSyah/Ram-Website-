@@ -18,6 +18,75 @@ import {
 
 const ADMIN_EMAIL = "im.raito.id@gmail.com";
 
+// account.html ada di folder yang sama dengan file ini, apa pun halaman yang memanggilnya
+const ACCOUNT_URL = new URL("account.html", import.meta.url).href;
+
+// Escape teks dari pengguna (nama/email/foto) sebelum masuk ke HTML
+const esc = (t) => String(t ?? "").replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+}[c]));
+
+
+// ---- TEMA ----
+// "auto" = ikut pengaturan HP (terang/gelap). Pilihan disimpan di browser.
+
+const THEMES = [
+    { id: "auto",  label: "Otomatis",  swatch: "linear-gradient(90deg,#f5f7fb 50%,#14171c 50%)" },
+    { id: "light", label: "Terang",    swatch: "linear-gradient(90deg,#f5f7fb 50%,#93CAED 50%)" },
+    { id: "dark",  label: "Gelap",     swatch: "linear-gradient(90deg,#14171c 50%,#93CAED 50%)" },
+    { id: "warm",  label: "Hangat",    swatch: "linear-gradient(90deg,#f6efe4 50%,#c8693f 50%)" },
+    { id: "mono",  label: "Monokrom",  swatch: "linear-gradient(90deg,#f2f2f2 50%,#222222 50%)" }
+];
+
+function getStoredTheme() {
+    try {
+        const t = localStorage.getItem("theme");
+        return THEMES.some(x => x.id === t) ? t : "auto";
+    } catch (e) {
+        return "auto";
+    }
+}
+
+function applyTheme(id) {
+    const root = document.documentElement;
+    if (!id || id === "auto") root.removeAttribute("data-theme");
+    else root.setAttribute("data-theme", id);
+}
+
+// Dipasang sedini mungkin (potongan kecil di <head> tiap halaman menghindari kedipan)
+applyTheme(getStoredTheme());
+
+function renderThemePicker() {
+    return `
+        <div class="auth-widget-section-label">Tema</div>
+        <div class="auth-widget-themes">
+            ${THEMES.map(t => `
+                <button type="button" class="auth-widget-theme-btn" data-theme-choice="${t.id}">
+                    <span class="auth-widget-swatch" style="background:${t.swatch};"></span>
+                    ${t.label}
+                </button>
+            `).join("")}
+        </div>
+    `;
+}
+
+function markActiveTheme() {
+    const current = getStoredTheme();
+    document.querySelectorAll("[data-theme-choice]").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.themeChoice === current);
+    });
+}
+
+function chooseTheme(id) {
+    try {
+        if (id === "auto") localStorage.removeItem("theme");
+        else localStorage.setItem("theme", id);
+    } catch (e) { /* penyimpanan diblokir: tema tetap berlaku untuk sesi ini */ }
+    applyTheme(id);
+    markActiveTheme();
+    window.dispatchEvent(new Event("themechange"));
+}
+
 
 // ---- SOCIAL LINKS ----
 
@@ -197,7 +266,7 @@ style.textContent = `
         padding: 3px 10px;
         border-radius: 20px;
         background: var(--accent, #5b9bd5);
-        color: #fff;
+        color: var(--on-accent, #fff);
         margin-top: 6px;
     }
 
@@ -216,7 +285,7 @@ style.textContent = `
 
     .auth-widget-btn.primary {
         background: var(--accent, #5b9bd5);
-        color: #fff;
+        color: var(--on-accent, #fff);
         border: none;
     }
 
@@ -262,6 +331,51 @@ style.textContent = `
         margin-top: 20px;
         letter-spacing: 1px;
         text-transform: uppercase;
+    }
+
+    .auth-widget-section-label {
+        text-align: center;
+        font-size: 12px;
+        color: var(--text-light, #888);
+        margin-top: 24px;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+    }
+
+    .auth-widget-themes {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-top: 12px;
+    }
+
+    .auth-widget-theme-btn {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0;
+        padding: 9px 10px;
+        border-radius: 10px;
+        border: 1px solid var(--border, #ddd);
+        background: var(--surface-soft, #f7f7f7);
+        color: var(--text, #333);
+        font-size: 13px;
+        cursor: pointer;
+        text-align: left;
+    }
+
+    .auth-widget-theme-btn.active {
+        border-color: var(--accent, #5b9bd5);
+        box-shadow: 0 0 0 1px var(--accent, #5b9bd5);
+        font-weight: bold;
+    }
+
+    .auth-widget-swatch {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        border: 1px solid var(--border, #ddd);
+        flex-shrink: 0;
     }
 
 `;
@@ -320,6 +434,7 @@ function renderLoggedOut() {
         <button class="auth-widget-btn primary" id="auth-widget-login-btn">
             Sign in with Google
         </button>
+        ${renderThemePicker()}
         ${renderSocialLinks()}
     `;
 
@@ -337,24 +452,25 @@ function renderLoggedOut() {
 
 function renderLoggedIn(user) {
 
-    trigger.innerHTML = `<img src="${user.photoURL || ''}" alt="${user.displayName || ''}">`;
+    trigger.innerHTML = `<img src="${esc(user.photoURL || '')}" alt="${esc(user.displayName || '')}">`;
 
     const isAdmin = user.email === ADMIN_EMAIL;
 
     contentEl.innerHTML = `
         <div class="auth-widget-profile">
-            <img src="${user.photoURL || ''}" alt="${user.displayName || ''}">
-            <p class="auth-widget-name">${user.displayName || 'Tanpa nama'}</p>
-            <p class="auth-widget-email">${user.email}</p>
+            <img src="${esc(user.photoURL || '')}" alt="${esc(user.displayName || '')}">
+            <p class="auth-widget-name">${esc(user.displayName || 'Tanpa nama')}</p>
+            <p class="auth-widget-email">${esc(user.email)}</p>
             ${isAdmin ? `<span class="auth-widget-badge">ADMIN</span>` : ""}
         </div>
 
-        ${isAdmin ? `<a href="account.html" style="text-decoration:none;"><button class="auth-widget-btn">Buka Panel Admin</button></a>` : ""}
+        ${isAdmin ? `<a href="${ACCOUNT_URL}" style="text-decoration:none;"><button class="auth-widget-btn">Buka Panel Admin</button></a>` : ""}
 
         <button class="auth-widget-btn" id="auth-widget-logout-btn">
             Logout
         </button>
 
+        ${renderThemePicker()}
         ${renderSocialLinks()}
     `;
 
@@ -363,10 +479,16 @@ function renderLoggedIn(user) {
 }
 
 
+contentEl.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-theme-choice]");
+    if (btn) chooseTheme(btn.dataset.themeChoice);
+});
+
 onAuthStateChanged(auth, (user) => {
     if (user) {
         renderLoggedIn(user);
     } else {
         renderLoggedOut();
     }
+    markActiveTheme();
 });

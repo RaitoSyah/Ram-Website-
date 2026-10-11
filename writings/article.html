@@ -360,7 +360,7 @@
     <script type="module">
 
         import { db, auth } from "../firebase-config.js";
-        import { sanitizeRich, loadCustomFonts } from "../rich-content.js";
+        import { sanitizeRich, loadCustomFonts, applyContrastGuard } from "../rich-content.js";
 
         import {
             doc,
@@ -604,6 +604,10 @@
                         <a class="back-link" href="${backHref}">← Back to ${backLabel}</a>
                     </p>
                 `;
+
+                // Warna teks pilihan penulis dijaga tetap terbaca di tema yang aktif
+                applyContrastGuard(contentEl);
+                window.addEventListener("themechange", () => applyContrastGuard(contentEl));
 
                 if (!isDraft) loadRelated(snap.id, data);
 

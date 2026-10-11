@@ -132,3 +132,96 @@ export function sanitizeRich(html) {
         ALLOWED_ATTR: ["href", "target", "rel", "class", "style"]
     }).replace(/&nbsp;|\u00a0/g, " "); // spasi khusus dari editor jadi spasi biasa
 }
+
+
+// ---------- Penjaga kontras warna teks (mengikuti tema yang sedang aktif) ----------
+// Warna yang dipilih di editor tetap tersimpan apa adanya. Saat ditampilkan,
+// kalau warna terlalu pudar di tema aktif, warnanya digeser sedikit supaya terbaca.
+// Dijalankan ulang setiap pengunjung mengganti tema.
+
+function parseRGBA(str) {
+    const m = String(str || "").match(/rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*(?:,\s*([\d.]+)\s*)?\)/);
+    if (!m) return null;
+    return { r: Number(m[1]), g: Number(m[2]), b: Number(m[3]), a: m[4] === undefined ? 1 : Number(m[4]) };
+}
+
+function luminance(c) {
+    const f = (v) => {
+        v /= 255;
+        return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    };
+    return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b);
+}
+
+function contrastRatio(a, b) {
+    const l1 = luminance(a);
+    const l2 = luminance(b);
+    return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+}
+
+function mixToward(c, target, t) {
+    return {
+        r: Math.round(c.r + (target.r - c.r) * t),
+        g: Math.round(c.g + (target.g - c.g) * t),
+        b: Math.round(c.b + (target.b - c.b) * t)
+    };
+}
+
+const cssRGB = (c) => `rgb(${c.r}, ${c.g}, ${c.b})`;
+
+function pageBackground(el) {
+    let n = el;
+    while (n && n.nodeType === 1) {
+        const c = parseRGBA(getComputedStyle(n).backgroundColor);
+        if (c && c.a > 0.99) return c;
+        n = n.parentElement;
+    }
+    return { r: 255, g: 255, b: 255, a: 1 };
+}
+
+export function applyContrastGuard(root) {
+
+    if (!root) return;
+
+    const page = pageBackground(root);
+    const WHITE = { r: 255, g: 255, b: 255 };
+    const BLACK = { r: 17, g: 17, b: 17 };
+
+    root.querySelectorAll("[style]").forEach(el => {
+
+        const st = el.style;
+
+        // Simpan warna pilihan penulis sekali, lalu selalu mulai dari situ
+        if (el.dataset.origColor === undefined) {
+            el.dataset.origColor = st.color || "";
+            el.dataset.origBg = st.backgroundColor || "";
+        }
+
+        st.color = el.dataset.origColor;
+        st.backgroundColor = el.dataset.origBg;
+
+        if (!el.dataset.origColor && !el.dataset.origBg) return;
+
+        const cs = getComputedStyle(el);
+        const fg = parseRGBA(cs.color);
+        const hl = el.dataset.origBg ? parseRGBA(cs.backgroundColor) : null;
+
+        if (!fg) return;
+
+        if (hl && hl.a > 0) {
+            // Highlight: teks di atasnya harus terbaca
+            if (contrastRatio(fg, hl) < 4.5) {
+                st.color = luminance(hl) > 0.4 ? cssRGB(BLACK) : cssRGB(WHITE);
+            }
+        } else if (el.dataset.origColor && contrastRatio(fg, page) < 4.5) {
+            // Warna teks terlalu pudar di tema ini: geser ke terang/gelap secukupnya
+            const target = luminance(page) < 0.4 ? WHITE : BLACK;
+            let c = fg;
+            for (let t = 0.1; t <= 1.0001; t += 0.1) {
+                c = mixToward(fg, target, t);
+                if (contrastRatio(c, page) >= 4.5) break;
+            }
+            st.color = cssRGB(c);
+        }
+    });
+}

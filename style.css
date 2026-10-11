@@ -1,9 +1,19 @@
 /* =========================
    COLOR PALETTE
    Ubah warna di sini saja
+
+   Ada 4 tema: Terang (bawaan), Gelap, Hangat, Monokrom.
+   Pengunjung memilihnya lewat panel di pojok kanan atas
+   (auth-widget.js). "Otomatis" mengikuti pengaturan HP.
+
+   --on-accent = warna teks di atas tombol/permukaan beraksen.
+   Kalau mau teks tombol Terang lebih kontras, ganti ke #20242a.
 ========================= */
 
+/* ---- TERANG (bawaan) ---- */
 :root {
+    color-scheme: light;
+
     --bg: #f5f7fb;
     --surface: #ffffff;
     --surface-soft: #f3f6fa;
@@ -16,6 +26,87 @@
 
     --accent: #93CAED;
     --accent-hover: #6488EA;
+    --on-accent: #ffffff;
+}
+
+/* ---- GELAP ----
+   Dipakai saat dipilih manual, dan otomatis saat HP pengunjung
+   memakai mode gelap (kalau dia belum memilih tema).
+   Kalau mengubah warna gelap, ubah di KEDUA blok di bawah. */
+:root[data-theme="dark"] {
+    color-scheme: dark;
+
+    --bg: #14171c;
+    --surface: #1c2027;
+    --surface-soft: #232830;
+
+    --text: #e6e9ee;
+    --text-muted: #aab3be;
+    --text-light: #9aa4b0;
+
+    --border: #2b323b;
+
+    --accent: #93CAED;
+    --accent-hover: #b4dcf3;
+    --on-accent: #0f1318;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) {
+        color-scheme: dark;
+
+        --bg: #14171c;
+        --surface: #1c2027;
+        --surface-soft: #232830;
+
+        --text: #e6e9ee;
+        --text-muted: #aab3be;
+        --text-light: #9aa4b0;
+
+        --border: #2b323b;
+
+        --accent: #93CAED;
+        --accent-hover: #b4dcf3;
+        --on-accent: #0f1318;
+    }
+}
+
+/* ---- HANGAT (krem dan terakota, seperti kertas) ---- */
+:root[data-theme="warm"] {
+    color-scheme: light;
+
+    --bg: #f6efe4;
+    --surface: #fffaf2;
+    --surface-soft: #f0e6d6;
+
+    --text: #2b231c;
+    --text-muted: #6b5d4f;
+    --text-light: #85766a;
+
+    --border: #e3d5bf;
+
+    --accent: #c8693f;
+    --accent-hover: #a9522c;
+    --on-accent: #ffffff;
+}
+
+/* ---- MONOKROM (hitam putih, satu aksen abu tua) ---- */
+:root[data-theme="mono"] {
+    color-scheme: light;
+
+    --bg: #f2f2f2;
+    --surface: #ffffff;
+    --surface-soft: #ebebeb;
+
+    --text: #111111;
+    --text-muted: #555555;
+    --text-light: #707070;
+
+    --border: #d6d6d6;
+
+    --accent: #222222;
+    --accent-hover: #555555;
+    --on-accent: #ffffff;
 }
 
 
@@ -157,7 +248,7 @@ button {
     border-radius: 10px;
     cursor: pointer;
     background: var(--accent);
-    color: #ffffff;
+    color: var(--on-accent);
     font-size: 15px;
     transition: 0.2s;
 }
@@ -252,7 +343,7 @@ footer {
     padding: 10px 16px;
     border-radius: 10px;
     background: var(--accent);
-    color: #ffffff;
+    color: var(--on-accent);
     transition: 0.2s;
 }
 
@@ -1077,13 +1168,18 @@ footer {
     font-size: 18px;
 
     background: var(--accent);
-    color: #ffffff;
+    color: var(--on-accent);
 }
 
 /* Warna ikon per jenis sumber — opsional, biar beda platform beda warna */
 .reference-icon.instagram { background: #E1306C; }
 .reference-icon.youtube   { background: #FF0000; }
 .reference-icon.journal   { background: #4A5568; }
+
+/* Ikon berwarna merek selalu memakai ikon putih, apa pun temanya */
+.reference-icon.instagram,
+.reference-icon.youtube,
+.reference-icon.journal { color: #ffffff; }
 .reference-icon.article   { background: var(--accent); }
 .reference-icon.other     { background: var(--text-light); }
 
