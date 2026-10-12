@@ -284,7 +284,7 @@ const style = document.createElement("style");
 style.textContent = `
 
     .auth-widget-trigger {
-        position: fixed;
+        position: absolute;
         top: 16px;
         right: 16px;
         z-index: 999;
@@ -332,13 +332,18 @@ style.textContent = `
         position: fixed;
         top: 0;
         right: 0;
-        bottom: 0;
+        bottom: auto;
+        height: 100vh;
+        height: 100dvh;
         width: min(85vw, 340px);
 
         background: var(--bg, #fff);
         box-shadow: -4px 0 20px rgba(0,0,0,0.15);
 
-        padding: 24px 20px;
+        /* Tombol tutup tetap di atas, isi panel yang bisa digulir */
+        display: flex;
+        flex-direction: column;
+        padding: 0;
         box-sizing: border-box;
 
         transform: translateX(100%);
@@ -355,8 +360,23 @@ style.textContent = `
         font-size: 20px;
         cursor: pointer;
         color: var(--text-light, #888);
-        float: right;
+        align-self: flex-end;
+        flex-shrink: 0;
+        margin: 14px 16px 0 0;
+        padding: 4px 8px;
     }
+
+    #auth-widget-content {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+        padding: 0 20px calc(28px + env(safe-area-inset-bottom, 0px));
+    }
+
+    /* Saat panel terbuka, halaman di belakangnya tidak ikut tergulir */
+    html.auth-widget-lock { overflow: hidden; }
 
     .auth-widget-profile {
         text-align: center;
@@ -585,7 +605,7 @@ style.textContent = `
 
     #auth-widget-dot {
         display: none;
-        position: fixed;
+        position: absolute;
         top: 12px;
         right: 12px;
         width: 12px;
@@ -643,10 +663,18 @@ const contentEl = document.getElementById("auth-widget-content");
 
 // ---- BUKA / TUTUP PANEL ----
 
-trigger.addEventListener("click", () => overlay.classList.add("open"));
-overlay.querySelector(".auth-widget-close").addEventListener("click", () => overlay.classList.remove("open"));
+function setPanel(open) {
+    overlay.classList.toggle("open", open);
+    document.documentElement.classList.toggle("auth-widget-lock", open);
+}
+
+trigger.addEventListener("click", () => setPanel(true));
+overlay.querySelector(".auth-widget-close").addEventListener("click", () => setPanel(false));
 overlay.addEventListener("click", (e) => {
-    if (e.target === overlay) overlay.classList.remove("open");
+    if (e.target === overlay) setPanel(false);
+});
+document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && overlay.classList.contains("open")) setPanel(false);
 });
 
 
