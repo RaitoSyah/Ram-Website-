@@ -64,8 +64,8 @@
             <p class="writing-category">RAMDHAN'S WRITINGS</p>
             <h2>Tersimpan</h2>
             <p class="card-meta">
-                Daftar ini disimpan di browser ini saja. Kalau data browser dihapus atau
-                kamu berpindah perangkat, daftar ini tidak ikut.
+                Tulisan yang kamu simpan tersimpan di akun Google-mu, jadi bisa dibuka
+                dari perangkat mana pun. Daftar ini hanya bisa dilihat olehmu.
             </p>
         </section>
 
@@ -94,34 +94,43 @@
 
     <script type="module">
 
-        import { db } from "../firebase-config.js";
+        import { auth, db } from "../firebase-config.js";
 
         import {
+            onAuthStateChanged
+        } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+
+        import {
+            collection,
+            query,
+            where,
+            getDocs,
             doc,
-            getDoc
+            getDoc,
+            setDoc,
+            deleteDoc,
+            serverTimestamp
         } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 
-        const SAVE_KEY = "savedArticles";
+        const LOCAL_KEY = "savedArticles"; // simpanan lama yang tersimpan di browser (versi sebelumnya)
 
         const listEl = document.getElementById("saved-list");
         const titleEl = document.getElementById("list-title");
+
+        let currentUser = null;
 
         const esc = (t) => String(t ?? "").replace(/[&<>"']/g, c => ({
             "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
         }[c]));
 
-        function readSaved() {
+        function localSaved() {
             try {
-                const arr = JSON.parse(localStorage.getItem(SAVE_KEY) || "[]");
+                const arr = JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]");
                 return Array.isArray(arr) ? arr.filter(x => x && typeof x.id === "string") : [];
             } catch (e) {
                 return [];
             }
-        }
-
-        function writeSaved(list) {
-            try { localStorage.setItem(SAVE_KEY, JSON.stringify(list)); } catch (e) { /* abaikan */ }
         }
 
         function formatDate(ts) {
@@ -168,13 +177,58 @@
             `;
         }
 
+        function showLoginPrompt() {
+            titleEl.textContent = "Masuk untuk melihat simpananmu";
+            listEl.innerHTML = `
+                <article class="writing-card">
+                    <p>Simpananmu tersimpan di akun Google, jadi kamu perlu masuk dulu.</p>
+                    <button type="button" class="more-btn" data-login>Masuk</button>
+                </article>
+            `;
+        }
+
         async function load() {
 
-            const saved = readSaved().sort((a, b) => (b.at || 0) - (a.at || 0));
+            if (!currentUser) {
+                showLoginPrompt();
+                return;
+            }
 
-            if (!saved.length) {
-                titleEl.textContent = "Belum ada yang disimpan";
+            titleEl.textContent = "Memuat...";
+
+            let ids;
+
+            try {
+                const snap = await getDocs(query(collection(db, "saves"), where("userId", "==", currentUser.uid)));
+                ids = snap.docs
+                    .map(d => {
+                        const x = d.data();
+                        return { id: x.articleId, at: x.createdAt && x.createdAt.toMillis ? x.createdAt.toMillis() : 0 };
+                    })
+                    .sort((a, b) => b.at - a.at);
+            } catch (e) {
+                titleEl.textContent = "Gagal memuat";
                 listEl.innerHTML = `
+                    <article class="writing-card">
+                        <p>Daftar simpanan tidak bisa dimuat. Pastikan aturan Firestore untuk koleksi <code>saves</code> sudah dipasang, lalu coba lagi.</p>
+                    </article>
+                `;
+                return;
+            }
+
+            // Simpanan lama dari browser ini (sebelum fitur ini per akun) bisa dipindahkan ke akun
+            const known = new Set(ids.map(x => x.id));
+            const old = localSaved().filter(x => !known.has(x.id));
+            const importHtml = old.length ? `
+                <article class="writing-card">
+                    <p>Ada ${old.length} tulisan yang kamu simpan di browser ini sebelumnya.</p>
+                    <button type="button" class="more-btn" data-import>Pindahkan ke akunku</button>
+                </article>
+            ` : "";
+
+            if (!ids.length) {
+                titleEl.textContent = "Belum ada yang disimpan";
+                listEl.innerHTML = importHtml + `
                     <article class="writing-card">
                         <p>Ketuk tombol <strong>Simpan</strong> di bawah sebuah tulisan, dan tulisan itu akan muncul di sini.</p>
                         <a href="all.html">Jelajahi tulisan →</a>
@@ -183,9 +237,9 @@
                 return;
             }
 
-            titleEl.textContent = `Tersimpan (${saved.length})`;
+            titleEl.textContent = `Tersimpan (${ids.length})`;
 
-            const rows = await Promise.all(saved.map(async (s) => {
+            const rows = await Promise.all(ids.map(async (s) => {
                 try {
                     const snap = await getDoc(doc(db, "writings", s.id));
                     return snap.exists()
@@ -196,17 +250,45 @@
                 }
             }));
 
-            listEl.innerHTML = rows.map(r => cardHtml(r.id, r.state, r.data)).join("");
+            listEl.innerHTML = importHtml + rows.map(r => cardHtml(r.id, r.state, r.data)).join("");
         }
 
-        document.addEventListener("click", (e) => {
-            const btn = e.target.closest("[data-remove]");
-            if (!btn) return;
-            writeSaved(readSaved().filter(x => x.id !== btn.dataset.remove));
-            load();
+        document.addEventListener("click", async (e) => {
+
+            if (e.target.closest("[data-login]")) {
+                const trigger = document.querySelector(".auth-widget-trigger");
+                if (trigger) trigger.click();
+                return;
+            }
+
+            const rm = e.target.closest("[data-remove]");
+            if (rm && currentUser) {
+                try {
+                    await deleteDoc(doc(db, "saves", `${currentUser.uid}_${rm.dataset.remove}`));
+                } catch (err) { /* abaikan */ }
+                load();
+                return;
+            }
+
+            if (e.target.closest("[data-import]") && currentUser) {
+                for (const x of localSaved()) {
+                    try {
+                        const ref = doc(db, "saves", `${currentUser.uid}_${x.id}`);
+                        const exists = (await getDoc(ref)).exists();
+                        if (!exists) {
+                            await setDoc(ref, { articleId: x.id, userId: currentUser.uid, createdAt: serverTimestamp() });
+                        }
+                    } catch (err) { /* lewati yang gagal */ }
+                }
+                try { localStorage.removeItem(LOCAL_KEY); } catch (err) { /* abaikan */ }
+                load();
+            }
         });
 
-        load();
+        onAuthStateChanged(auth, (user) => {
+            currentUser = user;
+            load();
+        });
 
     </script>
 

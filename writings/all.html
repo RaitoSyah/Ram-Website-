@@ -183,11 +183,6 @@
 
         const allEl = document.getElementById("all-writings");
 
-        // Jumlah tulisan yang disimpan di browser ini
-        try {
-            const n = JSON.parse(localStorage.getItem("savedArticles") || "[]").length;
-            if (n) document.getElementById("saved-link").textContent = `Tersimpan (${n}) →`;
-        } catch (e) { /* abaikan */ }
         const listTitle = document.getElementById("list-title");
         const searchInput = document.getElementById("search-input");
         const clearBtn = document.getElementById("search-clear");

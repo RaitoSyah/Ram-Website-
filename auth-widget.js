@@ -41,6 +41,7 @@ const esc = (t) => String(t ?? "").replace(/[&<>"']/g, c => ({
 // Tidak butuh server. Hanya jalan kalau website sedang dibuka.
 
 const ARTICLE_URL = new URL("writings/article.html", import.meta.url).href;
+const SAVED_URL = new URL("writings/saved.html", import.meta.url).href;
 
 let latest = null; // { id, title, ms } tulisan terbaru yang sudah terbit
 
@@ -697,6 +698,8 @@ function renderLoggedIn(user) {
             <p class="auth-widget-email">${esc(user.email)}</p>
             ${isAdmin ? `<span class="auth-widget-badge">ADMIN</span>` : ""}
         </div>
+
+        <a href="${SAVED_URL}" style="text-decoration:none;"><button class="auth-widget-btn" type="button">Tersimpan</button></a>
 
         ${isAdmin ? `<a href="${ACCOUNT_URL}" style="text-decoration:none;"><button class="auth-widget-btn">Buka Panel Admin</button></a>` : ""}
 

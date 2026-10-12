@@ -709,7 +709,7 @@
         // BAR AKSI: SUKA, BAGIKAN, SIMPAN
         // Suka   : likes/{idTulisan}_{uid} di Firestore (perlu login)
         // Bagikan: lembar bagikan bawaan HP, atau salin tautan
-        // Simpan : disimpan di browser ini (localStorage), dilihat di saved.html
+        // Simpan : saves/{uid}_{idTulisan} di Firestore, per akun (perlu login), dilihat di saved.html
         // ==========================================
 
         const actionBar = document.getElementById("action-bar");
@@ -722,8 +722,6 @@
 
         const likeState = { id: null, count: 0, liked: false, busy: false };
         let actionTitle = "";
-
-        const SAVE_KEY = "savedArticles";
 
         function setMsg(text, href, linkText) {
             actMsg.textContent = text || "";
@@ -897,58 +895,70 @@
             setTimeout(() => setMsg(""), 4000);
         });
 
-        // ---------- SIMPAN ----------
+        // ---------- SIMPAN (per akun) ----------
 
-        function readSaved() {
-            try {
-                const arr = JSON.parse(localStorage.getItem(SAVE_KEY) || "[]");
-                return Array.isArray(arr) ? arr.filter(x => x && typeof x.id === "string") : [];
-            } catch (e) {
-                return [];
-            }
-        }
-
-        function writeSaved(list) {
-            try {
-                localStorage.setItem(SAVE_KEY, JSON.stringify(list.slice(0, 200)));
-                return true;
-            } catch (e) {
-                return false;
-            }
-        }
+        const saveState = { saved: false, busy: false };
 
         function renderSave() {
-            const saved = readSaved().some(x => x.id === likeState.id);
-            saveBtn.classList.toggle("saved", saved);
-            saveBtn.setAttribute("aria-pressed", String(saved));
-            saveLabel.textContent = saved ? "Tersimpan" : "Simpan";
+            saveBtn.classList.toggle("saved", saveState.saved);
+            saveBtn.setAttribute("aria-pressed", String(saveState.saved));
+            saveLabel.textContent = saveState.saved ? "Tersimpan" : "Simpan";
         }
 
-        saveBtn.addEventListener("click", () => {
+        async function refreshSavedState() {
 
             if (!likeState.id) return;
 
-            let list = readSaved();
-            const already = list.some(x => x.id === likeState.id);
-
-            if (already) {
-                list = list.filter(x => x.id !== likeState.id);
-            } else {
-                list.unshift({ id: likeState.id, at: Date.now() });
-            }
-
-            if (!writeSaved(list)) {
-                setMsg("Browser memblokir penyimpanan, jadi tulisan ini tidak bisa disimpan.");
+            if (!currentUser) {
+                saveState.saved = false;
+                renderSave();
                 return;
             }
 
-            renderSave();
+            try {
+                const s = await getDoc(doc(db, "saves", `${currentUser.uid}_${likeState.id}`));
+                saveState.saved = s.exists();
+                renderSave();
+            } catch (e) { /* abaikan: tombol tetap bisa dipakai */ }
+        }
 
-            if (already) {
-                setMsg("Dihapus dari simpanan.");
-            } else {
-                popIcon(saveBtn);
-                setMsg("Disimpan di browser ini.", "saved.html", "Lihat tersimpan");
+        saveBtn.addEventListener("click", async () => {
+
+            if (!likeState.id || saveState.busy) return;
+
+            if (!currentUser) {
+                setMsg("Masuk dulu untuk menyimpan tulisan ini.");
+                const trigger = document.querySelector(".auth-widget-trigger");
+                if (trigger) trigger.click();
+                return;
+            }
+
+            saveState.busy = true;
+            setMsg("");
+
+            const ref = doc(db, "saves", `${currentUser.uid}_${likeState.id}`);
+
+            try {
+                if (saveState.saved) {
+                    await deleteDoc(ref);
+                    saveState.saved = false;
+                    renderSave();
+                    setMsg("Dihapus dari simpanan.");
+                } else {
+                    await setDoc(ref, {
+                        articleId: likeState.id,
+                        userId: currentUser.uid,
+                        createdAt: serverTimestamp()
+                    });
+                    saveState.saved = true;
+                    renderSave();
+                    popIcon(saveBtn);
+                    setMsg("Disimpan di akunmu.", "saved.html", "Lihat tersimpan");
+                }
+            } catch (e) {
+                setMsg("Gagal menyimpan. Coba lagi nanti.");
+            } finally {
+                saveState.busy = false;
             }
         });
 
@@ -957,6 +967,7 @@
             actionTitle = title || document.title;
             actionBar.style.display = "flex";
             renderSave();
+            refreshSavedState();
             initLikes(articleId);
         }
 
@@ -970,6 +981,7 @@
             currentUser = user;
 
             refreshLikedState();
+            refreshSavedState();
 
             if (user) {
                 loginPrompt.style.display = "none";
