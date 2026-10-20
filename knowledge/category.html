@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <script>/*theme-init*/(function(){try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark"||t==="warm"||t==="mono")document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Kategori - Knowledge Garden</title>
+
+    <meta name="description" content="Knowledge Garden: kumpulan hal yang kupelajari, telusuri, dan kutulis ulang dengan bahasaku sendiri.">
+
+      <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-QSZT4P4PVP"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-QSZT4P4PVP');
+    </script>
+
+    <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="garden.css">
+
+</head>
+
+
+<body>
+
+    <!-- =========================
+         HEADER
+    ========================= -->
+
+    <header>
+
+        <h1>Raito Syah</h1>
+
+        <nav>
+
+            <a href="../index.html">Home</a>
+
+            <a href="../about.html">About</a>
+
+            <a href="../writings/index.html">Writings</a>
+
+            <a href="../journal/index.html">Journal</a>
+
+            <a href="index.html">Knowledge</a>
+
+            <a href="../fun/index.html">Fun Stuff</a>
+
+            <a href="../index.html#private">Private Room</a>
+
+        </nav>
+
+    </header>
+
+
+    <main>
+
+        <noscript>
+            <section><p>Halaman ini membutuhkan JavaScript.</p></section>
+        </noscript>
+
+        <div id="kg-banner" class="kg-banner" hidden></div>
+
+        <section id="kg-head">
+            <p class="kg-empty">Memuat...</p>
+        </section>
+
+        <section id="kg-body" hidden>
+            <div id="kg-tagrow" class="kg-tags"></div>
+            <div class="kg-filters">
+                <select id="kg-sort" aria-label="Urutkan">
+                    <option value="new">Terbaru</option>
+                    <option value="az">A sampai Z</option>
+                </select>
+            </div>
+            <p class="kg-info" id="kg-info"></p>
+            <div id="kg-list"></div>
+            <button type="button" class="kg-btn kg-more" id="kg-more" hidden>Muat lebih banyak</button>
+        </section>
+
+        <p>
+            <a class="back-link" href="index.html">← Back to Knowledge Garden</a>
+        </p>
+
+    </main>
+
+
+    <footer>
+
+        <p>
+            © 2026 Ramdhan
+        </p>
+
+    </footer>
+
+<script type="module">
+
+    import {
+        loadIndex, cardHtml, esc, sortItems, countBy, categoryById, normalizeTag, PAGE_SIZE, DEMO_BANNER
+    } from "./garden.js";
+
+    const $ = (id) => document.getElementById(id);
+
+    const params = new URLSearchParams(location.search);
+    const catId = params.get("c") || "";
+    const state = { tag: normalizeTag(params.get("tag") || ""), sort: params.get("sort") === "az" ? "az" : "new", shown: PAGE_SIZE };
+
+    let items = [];
+
+    function writeParams() {
+        const u = new URL(location.href);
+        if (state.tag) u.searchParams.set("tag", state.tag); else u.searchParams.delete("tag");
+        if (state.sort === "az") u.searchParams.set("sort", "az"); else u.searchParams.delete("sort");
+        history.replaceState(null, "", u);
+    }
+
+    function renderTags() {
+        const counts = [...countBy(items, i => i.tags).entries()]
+            .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+            .slice(0, 30);
+
+        $("kg-tagrow").innerHTML = counts.map(([t, n]) =>
+            `<button type="button" class="kg-tag${state.tag === t ? " active" : ""}" data-tag="${esc(t)}">${esc(t)} (${n})</button>`
+        ).join("");
+    }
+
+    function renderList() {
+
+        let list = state.tag ? items.filter(i => i.tags.includes(state.tag)) : items;
+        list = sortItems(list, state.sort);
+
+        $("kg-info").textContent = state.tag ? `Tag: ${state.tag} · ${list.length} materi` : "";
+
+        if (!list.length) {
+            $("kg-list").innerHTML = `<div class="writing-card"><p>Belum ada materi${state.tag ? " dengan tag ini" : " di kategori ini"}.</p></div>`;
+            $("kg-more").hidden = true;
+            return;
+        }
+
+        $("kg-list").innerHTML = list.slice(0, state.shown).map(cardHtml).join("");
+
+        if (list.length > state.shown) {
+            $("kg-more").hidden = false;
+            $("kg-more").textContent = `Muat lebih banyak (${list.length - state.shown} lagi)`;
+        } else {
+            $("kg-more").hidden = true;
+        }
+    }
+
+    document.addEventListener("click", (e) => {
+        const b = e.target.closest("[data-tag]");
+        if (!b) return;
+        state.tag = state.tag === b.dataset.tag ? "" : b.dataset.tag;
+        state.shown = PAGE_SIZE;
+        writeParams(); renderTags(); renderList();
+    });
+
+    $("kg-sort").addEventListener("change", (e) => { state.sort = e.target.value; writeParams(); renderList(); });
+    $("kg-more").addEventListener("click", () => { state.shown += PAGE_SIZE; renderList(); });
+
+    async function init() {
+
+        const cat = categoryById(catId);
+
+        if (!cat) {
+            $("kg-head").innerHTML = `
+                <h2>Kategori tidak ditemukan</h2>
+                <p>Kategori yang kamu cari tidak ada. <a href="index.html">Lihat semua kategori</a>.</p>
+            `;
+            return;
+        }
+
+        document.title = cat.name + " - Knowledge Garden";
+
+        try {
+            const data = await loadIndex();
+            items = data.items.filter(i => i.category === cat.id);
+
+            if (data.demo) {
+                $("kg-banner").textContent = DEMO_BANNER;
+                $("kg-banner").hidden = false;
+            }
+
+            $("kg-head").innerHTML = `
+                <p class="writing-category">KATEGORI</p>
+                <h2>${esc(cat.name)}</h2>
+                <p>${esc(cat.description)}</p>
+                <p class="kg-meta">${items.length} materi</p>
+            `;
+
+            $("kg-sort").value = state.sort;
+            $("kg-body").hidden = false;
+            renderTags();
+            renderList();
+
+        } catch (e) {
+            $("kg-head").innerHTML = `<h2>${esc(cat.name)}</h2><p>Materi tidak bisa dimuat. Periksa koneksi lalu muat ulang halaman.</p>`;
+        }
+    }
+
+    init();
+
+</script>
+<script type="module" src="../auth-widget.js"></script>
+</body>
+
+</html>

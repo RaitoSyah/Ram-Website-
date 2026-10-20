@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <script>/*theme-init*/(function(){try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark"||t==="warm"||t==="mono")document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Knowledge Garden - Raito Syah</title>
+
+    <meta name="description" content="Knowledge Garden: kumpulan hal yang kupelajari, telusuri, dan kutulis ulang dengan bahasaku sendiri.">
+
+      <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-QSZT4P4PVP"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-QSZT4P4PVP');
+    </script>
+
+    <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="garden.css">
+
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.4/dist/purify.min.js"></script>
+</head>
+
+
+<body>
+
+    <!-- =========================
+         HEADER
+    ========================= -->
+
+    <header>
+
+        <h1>Raito Syah</h1>
+
+        <nav>
+
+            <a href="../index.html">Home</a>
+
+            <a href="../about.html">About</a>
+
+            <a href="../writings/index.html">Writings</a>
+
+            <a href="../journal/index.html">Journal</a>
+
+            <a href="index.html">Knowledge</a>
+
+            <a href="../fun/index.html">Fun Stuff</a>
+
+            <a href="../index.html#private">Private Room</a>
+
+        </nav>
+
+    </header>
+
+
+    <main>
+
+        <noscript>
+            <section><p>Halaman ini membutuhkan JavaScript.</p></section>
+        </noscript>
+
+        <div id="kg-banner" class="kg-banner" hidden></div>
+
+        <section id="kg-article">
+            <p class="kg-empty">Memuat...</p>
+        </section>
+
+        <section id="kg-related-section" hidden>
+            <h2>Materi terkait</h2>
+            <div id="kg-related"></div>
+        </section>
+
+        <p>
+            <a class="back-link" href="index.html">← Back to Knowledge Garden</a>
+        </p>
+
+    </main>
+
+
+    <footer>
+
+        <p>
+            © 2026 Ramdhan
+        </p>
+
+    </footer>
+
+<script type="module">
+
+    import { getItem, getRelated, cardHtml, esc, categoryById, formatDate, DEMO_BANNER } from "./garden.js";
+    import { sanitizeRich, loadCustomFonts, applyContrastGuard } from "../rich-content.js";
+
+    const $ = (id) => document.getElementById(id);
+
+    const params = new URLSearchParams(location.search);
+    const slug = params.get("s") || "";
+    const isDraft = params.get("draft") === "1"; // pratinjau draft: hanya admin yang diizinkan aturan Firestore
+
+    // Daftar isi hanya untuk materi yang cukup panjang dan punya beberapa bagian
+    const TOC_MIN_HEADINGS = 3;
+    const TOC_MIN_MINUTES = 3;
+
+    function safeUrl(u) {
+        return /^https?:\/\//i.test(String(u || "").trim()) ? String(u).trim() : "";
+    }
+
+    function sourceHtml(s) {
+        const url = safeUrl(s.url);
+        const title = url
+            ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(s.title)}</a>`
+            : esc(s.title);
+        const head = [s.author ? esc(s.author) : "", s.year ? `(${esc(s.year)})` : ""].filter(Boolean).join(" ");
+        const pub = s.publication ? ` ${esc(s.publication)}.` : "";
+        const note = s.note ? `<span class="kg-support">Mendukung: ${esc(s.note)}</span>` : "";
+        return `<li>${head ? head + ". " : ""}${title}.${pub}${note}</li>`;
+    }
+
+    function notFound() {
+        $("kg-article").innerHTML = `
+            <h2>Materi tidak ditemukan</h2>
+            <p>Materi yang kamu cari tidak ada atau belum diterbitkan. <a href="index.html">Kembali ke Knowledge Garden</a>.</p>
+        `;
+        document.title = "Materi tidak ditemukan - Knowledge Garden";
+    }
+
+    function buildToc(root, minutes) {
+        const hs = [...root.querySelectorAll("h2, h3")];
+        if (hs.length < TOC_MIN_HEADINGS || minutes < TOC_MIN_MINUTES) return "";
+        hs.forEach((h, i) => { h.id = "kg-h-" + (i + 1); });
+        return `
+            <details class="kg-toc">
+                <summary>Daftar isi</summary>
+                <ol>${hs.map(h => `<li class="${h.tagName === "H3" ? "sub" : ""}"><a href="#${h.id}">${esc(h.textContent)}</a></li>`).join("")}</ol>
+            </details>
+        `;
+    }
+
+    async function init() {
+
+        if (!slug) { notFound(); return; }
+
+        let result;
+
+        try {
+            result = await getItem(slug, isDraft);
+        } catch (e) {
+            if (e && e.code === "permission-denied") { notFound(); return; }
+            $("kg-article").innerHTML = `<h2>Gagal memuat</h2><p>Materi tidak bisa dimuat. Periksa koneksi lalu muat ulang halaman.</p>`;
+            return;
+        }
+
+        if (!result) { notFound(); return; }
+
+        const { item, demo } = result;
+        const cat = categoryById(item.category);
+
+        document.title = item.title + " - Knowledge Garden";
+
+        if (demo) {
+            $("kg-banner").textContent = DEMO_BANNER;
+            $("kg-banner").hidden = false;
+        } else if (result.draft) {
+            $("kg-banner").textContent = "DRAFT · Pratinjau, belum terbit. Hanya kamu yang bisa melihat ini.";
+            $("kg-banner").hidden = false;
+        }
+
+        const date = formatDate(item.publishedMs);
+        const updated = formatDate(item.updatedMs);
+        const metaParts = [];
+        if (result.draft) metaParts.push("Draft");
+        else if (date) metaParts.push("Published " + date);
+        if (!result.draft && updated && updated !== date) metaParts.push("Updated " + updated);
+        metaParts.push(item.minutes + " min read");
+
+        const crumbs = `
+            <nav class="kg-crumbs" aria-label="Breadcrumb">
+                <a href="../index.html">Home</a><span>›</span>
+                <a href="index.html">Knowledge Garden</a>
+                ${cat ? `<span>›</span><a href="category.html?c=${encodeURIComponent(cat.id)}">${esc(cat.name)}</a>` : ""}
+                <span>›</span>${esc(item.title)}
+            </nav>
+        `;
+
+        const tags = item.tags.length
+            ? `<div class="kg-tags">${item.tags.map(t => `<a class="kg-tag" href="index.html?tag=${encodeURIComponent(t)}">${esc(t)}</a>`).join("")}</div>`
+            : "";
+
+        const interp = item.interpretation && item.interpretation.trim() ? `
+            <div class="kg-interp">
+                <h3>Interpretasi penulis</h3>
+                <p class="kg-note">Bagian ini adalah pandangan pribadi penulis, bukan fakta yang sudah terverifikasi.</p>
+                <p>${esc(item.interpretation)}</p>
+            </div>
+        ` : "";
+
+        const sources = item.sources.length ? `
+            <h3 class="kg-section-title">Referensi</h3>
+            <ol class="kg-sources">${item.sources.map(sourceHtml).join("")}</ol>
+        ` : "";
+
+        $("kg-article").innerHTML = `
+            ${crumbs}
+            <p class="writing-category">${esc(cat ? cat.name : "Tanpa kategori")}${demo ? ' <span class="kg-badge">DEMO</span>' : ""}</p>
+            <h2>${esc(item.title)}</h2>
+            <p class="kg-summary">${esc(item.summary)}</p>
+            <p class="kg-meta">${esc(metaParts.join(" · "))}</p>
+            ${tags}
+            <div id="kg-toc"></div>
+            <div class="kg-content" id="kg-body"></div>
+            ${interp}
+            ${sources}
+        `;
+
+        // Isi: font didaftarkan dan HTML disaring sebelum ditampilkan
+        await loadCustomFonts();
+        const clean = sanitizeRich(item.content || "");
+        const body = $("kg-body");
+
+        if (clean === null) {
+            body.innerHTML = "<p>Isi materi tidak dapat ditampilkan. Muat ulang halaman.</p>";
+        } else {
+            body.innerHTML = clean;
+            $("kg-toc").innerHTML = buildToc(body, item.minutes);
+            applyContrastGuard(body);
+            window.addEventListener("themechange", () => applyContrastGuard(body));
+        }
+
+        // Tautan #bagian dari daftar isi tetap bekerja walau isi baru ditambahkan lewat skrip
+        if (location.hash) {
+            const el = document.getElementById(location.hash.slice(1));
+            if (el) el.scrollIntoView();
+        }
+
+        // Materi terkait (bukan untuk draft)
+        if (!result.draft) {
+            try {
+                const rel = await getRelated(item, demo);
+                if (rel.length) {
+                    $("kg-related").innerHTML = rel.map(cardHtml).join("");
+                    $("kg-related-section").hidden = false;
+                }
+            } catch (e) { /* bersifat tambahan */ }
+        }
+    }
+
+    init();
+
+</script>
+<script type="module" src="../auth-widget.js"></script>
+</body>
+
+</html>

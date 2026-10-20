@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <script>/*theme-init*/(function(){try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark"||t==="warm"||t==="mono")document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Knowledge Garden - Raito Syah</title>
+
+    <meta name="description" content="Knowledge Garden: kumpulan hal yang kupelajari, telusuri, dan kutulis ulang dengan bahasaku sendiri.">
+
+      <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-QSZT4P4PVP"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-QSZT4P4PVP');
+    </script>
+
+    <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="garden.css">
+
+</head>
+
+
+<body>
+
+    <!-- =========================
+         HEADER
+    ========================= -->
+
+    <header>
+
+        <h1>Raito Syah</h1>
+
+        <nav>
+
+            <a href="../index.html">Home</a>
+
+            <a href="../about.html">About</a>
+
+            <a href="../writings/index.html">Writings</a>
+
+            <a href="../journal/index.html">Journal</a>
+
+            <a href="index.html">Knowledge</a>
+
+            <a href="../fun/index.html">Fun Stuff</a>
+
+            <a href="../index.html#private">Private Room</a>
+
+        </nav>
+
+    </header>
+
+
+    <main>
+
+        <noscript>
+            <section>
+                <p>Knowledge Garden membutuhkan JavaScript. Aktifkan JavaScript di browsermu lalu muat ulang halaman ini.</p>
+            </section>
+        </noscript>
+
+        <div id="kg-banner" class="kg-banner" hidden></div>
+
+        <!-- PENGENALAN -->
+
+        <section>
+            <p class="writing-category">KNOWLEDGE GARDEN</p>
+            <h2>Knowledge Garden 🌱</h2>
+            <p class="kg-tagline">Small notes, growing understanding.</p>
+            <p>Kumpulan hal yang kupelajari, telusuri, dan kutulis ulang dengan bahasaku sendiri.</p>
+        </section>
+
+        <!-- PENCARIAN -->
+
+        <section>
+            <div class="kg-search">
+                <input type="search" id="kg-q" placeholder="Search knowledge, concepts, and ideas..." autocomplete="off" aria-label="Cari materi">
+                <button type="button" class="kg-btn" id="kg-clear" hidden aria-label="Hapus pencarian">✕</button>
+            </div>
+        </section>
+
+        <!-- KATEGORI -->
+
+        <section id="kg-cats-section">
+            <h2>Kategori</h2>
+            <div class="kg-catgrid" id="kg-cats"><p class="kg-empty">Memuat...</p></div>
+        </section>
+
+        <!-- MATERI PILIHAN -->
+
+        <section id="kg-featured-section" hidden>
+            <h2>Materi pilihan</h2>
+            <div id="kg-featured"></div>
+        </section>
+
+        <!-- BARU DITAMBAHKAN -->
+
+        <section id="kg-recent-section" hidden>
+            <h2>Baru ditambahkan</h2>
+            <div id="kg-recent"></div>
+        </section>
+
+        <!-- JELAJAHI SEMUA -->
+
+        <section id="kg-browse-section">
+            <h2 id="kg-browse-title">Jelajahi semua</h2>
+            <div class="kg-filters">
+                <select id="kg-cat-filter" aria-label="Filter kategori"></select>
+                <select id="kg-tag-filter" aria-label="Filter tag"></select>
+                <select id="kg-sort" aria-label="Urutkan">
+                    <option value="new">Terbaru</option>
+                    <option value="az">A sampai Z</option>
+                </select>
+            </div>
+            <p class="kg-info" id="kg-info"></p>
+            <div id="kg-list"></div>
+            <button type="button" class="kg-btn kg-more" id="kg-more" hidden>Muat lebih banyak</button>
+        </section>
+
+    </main>
+
+
+    <footer>
+
+        <p>
+            © 2026 Ramdhan
+        </p>
+
+    </footer>
+
+<script type="module">
+
+    import {
+        loadIndex, cardHtml, esc, searchItems, sortItems, countBy,
+        CATEGORIES, categoryById, normalizeTag, PAGE_SIZE, DEMO_BANNER
+    } from "./garden.js";
+
+    const $ = (id) => document.getElementById(id);
+
+    let all = [];
+    const state = { q: "", c: "", tag: "", sort: "new", shown: PAGE_SIZE };
+
+    // Alamat hanya memuat kategori, tag, dan urutan. Teks pencarian sengaja tidak dimasukkan ke alamat.
+    function readParams() {
+        const p = new URLSearchParams(location.search);
+        state.c = p.get("c") || "";
+        state.tag = normalizeTag(p.get("tag") || "");
+        state.sort = p.get("sort") === "az" ? "az" : "new";
+    }
+
+    function writeParams() {
+        const u = new URL(location.href);
+        const set = (k, v) => { if (v && !(k === "sort" && v === "new")) u.searchParams.set(k, v); else u.searchParams.delete(k); };
+        set("c", state.c); set("tag", state.tag); set("sort", state.sort);
+        history.replaceState(null, "", u);
+    }
+
+    function buildControls() {
+
+        const catCount = countBy(all, i => i.category);
+
+        $("kg-cats").innerHTML = CATEGORIES
+            .filter(c => catCount.get(c.id))
+            .map(c => `
+                <a class="kg-cat" href="category.html?c=${encodeURIComponent(c.id)}">
+                    <strong>${esc(c.name)}</strong>
+                    <span>${esc(c.description)}</span>
+                    <em>${catCount.get(c.id)} materi</em>
+                </a>
+            `).join("") || '<p class="kg-empty">Belum ada kategori yang berisi materi.</p>';
+
+        $("kg-cat-filter").innerHTML = '<option value="">Semua kategori</option>' + CATEGORIES
+            .filter(c => catCount.get(c.id))
+            .map(c => `<option value="${esc(c.id)}">${esc(c.name)} (${catCount.get(c.id)})</option>`).join("");
+
+        const tagCount = [...countBy(all, i => i.tags).entries()]
+            .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+            .slice(0, 40);
+
+        $("kg-tag-filter").innerHTML = '<option value="">Semua tag</option>' +
+            tagCount.map(([t, n]) => `<option value="${esc(t)}">${esc(t)} (${n})</option>`).join("");
+
+        // tag dari alamat yang tidak ada di daftar tetap bisa dipilih
+        if (state.tag && !tagCount.some(([t]) => t === state.tag)) {
+            $("kg-tag-filter").insertAdjacentHTML("beforeend", `<option value="${esc(state.tag)}">${esc(state.tag)}</option>`);
+        }
+
+        $("kg-cat-filter").value = state.c;
+        $("kg-tag-filter").value = state.tag;
+        $("kg-sort").value = state.sort;
+    }
+
+    function render() {
+
+        const filtering = !!(state.q.trim() || state.c || state.tag);
+
+        $("kg-clear").hidden = !state.q;
+
+        // Materi pilihan dan terbaru hanya tampil saat tidak sedang mencari atau menyaring
+        const featured = sortItems(all.filter(i => i.featured), "new").slice(0, 3);
+        $("kg-featured-section").hidden = filtering || !featured.length;
+        $("kg-featured").innerHTML = featured.map(cardHtml).join("");
+
+        const recent = sortItems(all, "new").slice(0, 6);
+        $("kg-recent-section").hidden = filtering || !recent.length;
+        $("kg-recent").innerHTML = recent.map(cardHtml).join("");
+
+        let items = searchItems(all, state.q);
+        if (state.c) items = items.filter(i => i.category === state.c);
+        if (state.tag) items = items.filter(i => i.tags.includes(state.tag));
+        items = sortItems(items, state.sort);
+
+        $("kg-browse-title").textContent = filtering ? `Hasil (${items.length})` : `Jelajahi semua (${items.length})`;
+
+        const parts = [];
+        if (state.c) { const c = categoryById(state.c); parts.push("Kategori: " + (c ? c.name : state.c)); }
+        if (state.tag) parts.push("Tag: " + state.tag);
+        $("kg-info").textContent = parts.join(" · ");
+
+        if (!items.length) {
+            $("kg-list").innerHTML = `
+                <div class="writing-card">
+                    <h3>${filtering ? "Belum ada yang cocok" : "Belum ada materi"}</h3>
+                    <p>${filtering ? "Coba kata kunci lain, atau hapus pencarian dan filternya untuk melihat semua materi." : "Materi pertama akan muncul di sini."}</p>
+                    ${filtering ? '<button type="button" class="kg-btn" id="kg-reset">Hapus pencarian dan filter</button>' : ""}
+                </div>
+            `;
+            $("kg-more").hidden = true;
+            return;
+        }
+
+        $("kg-list").innerHTML = items.slice(0, state.shown).map(cardHtml).join("");
+
+        if (items.length > state.shown) {
+            $("kg-more").hidden = false;
+            $("kg-more").textContent = `Muat lebih banyak (${items.length - state.shown} lagi)`;
+        } else {
+            $("kg-more").hidden = true;
+        }
+    }
+
+    function resetAll() {
+        state.q = ""; state.c = ""; state.tag = ""; state.shown = PAGE_SIZE;
+        $("kg-q").value = ""; $("kg-cat-filter").value = ""; $("kg-tag-filter").value = "";
+        writeParams();
+        render();
+    }
+
+    $("kg-q").addEventListener("input", (e) => { state.q = e.target.value; state.shown = PAGE_SIZE; render(); });
+    $("kg-clear").addEventListener("click", () => { state.q = ""; $("kg-q").value = ""; state.shown = PAGE_SIZE; render(); $("kg-q").focus(); });
+    $("kg-cat-filter").addEventListener("change", (e) => { state.c = e.target.value; state.shown = PAGE_SIZE; writeParams(); render(); });
+    $("kg-tag-filter").addEventListener("change", (e) => { state.tag = e.target.value; state.shown = PAGE_SIZE; writeParams(); render(); });
+    $("kg-sort").addEventListener("change", (e) => { state.sort = e.target.value; writeParams(); render(); });
+    $("kg-more").addEventListener("click", () => { state.shown += PAGE_SIZE; render(); });
+    document.addEventListener("click", (e) => { if (e.target.id === "kg-reset") resetAll(); });
+
+    async function init() {
+
+        readParams();
+
+        try {
+            const data = await loadIndex();
+            all = data.items;
+
+            if (data.demo) {
+                $("kg-banner").textContent = DEMO_BANNER;
+                $("kg-banner").hidden = false;
+            }
+
+            buildControls();
+            render();
+
+        } catch (e) {
+            const msg = e && e.code === "permission-denied"
+                ? "Materi belum bisa dimuat: aturan Firestore untuk koleksi knowledge belum dipasang."
+                : "Materi tidak bisa dimuat. Periksa koneksi lalu muat ulang halaman.";
+            $("kg-cats").innerHTML = "";
+            $("kg-list").innerHTML = `<div class="writing-card"><p>${esc(msg)}</p></div>`;
+            $("kg-browse-title").textContent = "Jelajahi semua";
+        }
+    }
+
+    init();
+
+</script>
+<script type="module" src="../auth-widget.js"></script>
+</body>
+
+</html>
